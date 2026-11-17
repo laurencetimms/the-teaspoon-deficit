@@ -1,5 +1,7 @@
 # The Teaspoon Deficit
 
+> **Branch `stage-one`:** a rebuild of the first era for a longer game. It adds a Workshop with crafting chains and upgrades, crew with traits and skills, duties the crew learn by trial and error, a Mind grown from oddly named subsystems, story chains, and neighbours who sell what you cannot make. It ends when you reignite the engine; stage two comes next.
+
 An idle game for small creatures and large mistakes. You are a derelict cutlery ship, woken after nine thousand years with one instruction (spoons) and a crew of tardigrades who moved in by accident.
 
 It is a mash-up in spirit of village-building idle games, paperclip-style runaway optimisers and dry British space comedy. All names, text and mechanics are original.
@@ -35,20 +37,20 @@ Any static host will do. For GitHub Pages: Settings → Pages → deploy from th
 
 ```sh
 python3 build.py                 # writes index.html and build/test.html
-node tools/sim.js spoons 1       # full run, attentive player
-node tools/sim.js crew 1 "" tea  # crew-first run, taking the Long Tea ending
+node tools/sim.js 1 60           # attentive bot, up to 60 game hours
+node tools/sim.js 0.005 100      # a bot that acts about once every three minutes
 ```
 
 The browser tools need Playwright (`npm i playwright`). They read the state files `tools/sim.js` writes to `build/`, so run a simulation first. Set `CHROME=/path/to/chrome` to use an installed browser.
 
 ```sh
 node tools/shot.js               # screenshots into build/
-node tools/play.js               # scripted first ten minutes, pause, away time, an ending, a new life
+node tools/play.js               # scripted opening, Mind, a story, a duty, crafting, away time
 ```
 
-## Balance notes
+## Balance notes (stage one)
 
-A simulated perfect player reaches the earliest ending in about 1.5 hours and the full one in about 8, so expect a few days of real sessions. Known soft spots: whimsy gets too plentiful late on, and the middle stretch has a quiet hour while thinking capacity catches up with the big projects.
+The bot reaches Ignition in about 7 hours when attentive and 8 to 16 hours when it acts every minute or few. The longest wait between new things is under an hour for most of the era. A person with sessions, sleep and the twelve-hour offline cap should take a couple of days.
 
 ## Saving on other hosts
 
