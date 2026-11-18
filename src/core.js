@@ -62,9 +62,9 @@ function newState(quirk){
     mand:0, mp:0, accord:60, accMod:0, fest:0, weather:0, hails:3, stand:{choir:0, bloom:0, quorate:0}, traded:{},
     pedlar:0, pedT:rnd(500,800), comet:0, cometT:rnd(120,200), comets:0,
     st:{cur:null, done:{}, step:{}, flags:{}, nextT:rnd(150,240), last:[], ign:0, wait:{}},
-    duty:{}, keep:{}, mind:{nodes:[{k:'stem', lv:1, p:-1, cond:1, v:1}], heat:0, offer:null, ct:0, trial:null, sulk:{}, glT:0, sockT:0, temp:{}, sel:0},
+    duty:{}, keep:{}, mind:{nodes:[{k:'stem', lv:1, p:-1, cond:1, v:1}], task:'idle', coach:'', dream:0, dreams:0, fc:0, heat:0, offer:null, ct:0, trial:null, sulk:{}, glT:0, sockT:0, temp:{}, sel:0},
     lastAct:0, taste:Math.floor(Math.random()*3), cand:null, fleet:[], goodNames:0,
-    m:{graze:1,bed:1,scav:1,press:1,yield:1,craft:1,smelt:1,notion:1,ice:1,cond:1,kettle:1,warm:1,fuel:1,cap:1,icecap:1,ncap:1,lcap:1,learn:1,comfort:1,hail:1,obs:1,mind:1,hand:1,berth:0,rota:1,stem:1,hcap:1},
+    m:{graze:1,bed:1,scav:1,press:1,yield:1,craft:1,smelt:1,notion:1,ice:1,cond:1,kettle:1,warm:1,fuel:1,cap:1,icecap:1,ncap:1,lcap:1,learn:1,comfort:1,hail:1,obs:1,mind:1,hand:1,berth:0,rota:1,stem:1,hcap:1,bunk:1,rackB:5,warrenB:4},
     tmpm:[], accPerm:0, quirk:quirk||'', heir:hz, log:[], ended:'', bank:0, flux:0, sunTaps:0, _sp:0, _used:0, acts:0};
   if (hz.small) { S.b.hut = 2; S.b.bed = 1; S.seen.lichen = 1; }
   return S;
@@ -90,12 +90,19 @@ const BLD = {
  band:{n:'Bandstand',d:'For the bards, who were going to perform anyway.',c:{plate:25,wire:5},k:1.3,e:'comfort +2',req:S=>S.done.music},
  shelf:{n:'Ledger shelves',d:'Floor-to-ceiling, then a bit more.',c:{plate:15,ledger:2},k:1.2,e:'+1.5K notion storage',req:S=>S.done.bookkeeping},
  mill:{n:'Drawing mill',d:'Pulls plate into wire, slowly, with a noise like a cat.',c:{plate:40,gear:2},k:1.15,e:'turns plate into wire',req:S=>S.done.drawmill},
+ bunker:{n:'Scrap bunker',d:'A sealed hold for scrap, lined with plate so it does not wander off.',c:{plate:40,spring:4},k:1.25,e:'+1.5K scrap storage',req:S=>S.done.springs},
+ warren:{n:'Warren',d:'Dug by the crew themselves, into the old insulation. They will not let you see the plans.',c:{lichen:1500,plate:12},k:1.3,e:'+4 berths',req:S=>S.st.flags.homes},
  garden:{n:'Moss garden',d:'Ornamental lichen. Grown from neighbours’ spores, for looking at.',c:{spores:3,plate:10},k:1.2,e:'comfort +3, +0.4 lichen/s',req:S=>S.done.gardening}};
-function bcost(S, id, q){ const d = BLD[id], n = nb(S,id), o = {}; const f = Math.pow(d.k,n) * (Math.pow(d.k,q)-1)/(d.k-1); for (const r in d.c) o[r] = d.c[r]*f; return o; }
+const scrapCap = S => (100 + 150*nb(S,'locker') + 1500*nb(S,'bunker')*S.m.bunk)*S.m.cap;
+/* a building never asks for more scrap than 90% of what you can store: the rest is asked in plate, 50 scrap to a plate */
+function bcost(S, id, q, raw){ const d = BLD[id], n = nb(S,id), o = {}; const f = Math.pow(d.k,n) * (Math.pow(d.k,q)-1)/(d.k-1); for (const r in d.c) o[r] = d.c[r]*f;
+  if (!raw && o.scrap) { const lim = scrapCap(S)*0.9; if (o.scrap > lim) { o.plate = (o.plate||0) + (o.scrap - lim)/50; o.scrap = lim; } }
+  return o; }
+function buy1cost(S, id){ return bcost(S, id, 1); }
 function buy(S, id, q){
   if (!BLD[id].req(S)) return 0;
   let got = 0; q = q || 1;
-  while (got < q && got < 500) { const c = bcost(S,id,1); if (!canPay(S,c)) break; pay(S,c); S.b[id] = nb(S,id)+1; got++; }
+  while (got < q && got < 500) { const c = buy1cost(S,id); if (!canPay(S,c)) break; pay(S,c); S.b[id] = nb(S,id)+1; got++; }
   if (got && id == 'bench' && nb(S,'bench') == got) log(S,'The Workshop is open. Scrap can be hammered into plate.','big');
   hook(got ? 'buy' : 'fail'); return got;
 }
@@ -155,6 +162,7 @@ const UPG = [
  {id:'lathe',n:'Lathe',d:'Crafting +25%.',c:{gear:5,plate:20},req:S=>S.done.gears,fx:mulf('craft',1.25)},
  {id:'stemgear',n:'Brainstem gearing',d:'The Brainstem thinks three times as fast.',c:{gear:8,wire:10},req:S=>S.done.gears,fx:mulf('stem',3)},
  {id:'ferment',n:'Fermentation vats',d:'Grazers and beds ×2.',c:{plate:40,ice:300},req:S=>S.done.ferment,fx:S=>{S.m.graze*=2;S.m.bed*=2;}},
+ {id:'rivbunk',n:'Riveted bunkers',d:'Scrap bunkers hold twice as much.',c:{gear:10,plate:60},req:S=>nb(S,'bunker')>=3,fx:mulf('bunk',2)},
  {id:'tess',n:'Tessellated storage',d:'Lockers hold 50% more.',c:{plate:60,spring:5},req:S=>S.done.tess,fx:mulf('cap',1.5)}];
 const UPG_BY = {}; UPG.forEach(u => UPG_BY[u.id] = u);
 const upgOpen = S => UPG.filter(u => !S.up[u.id] && u.req(S));
@@ -230,8 +238,13 @@ function mindCalc(S, c){
   return {cps: cps*(1-div), out, heat: net, hcap, pen, cap: cap*(S.done.attic2 ? 1.5 : 1), notions: cps*div/6, gland, bilge, raw: cps};
 }
 function mindScore(S){ const c = calc(S); return c.mind.cps + c.mind.notions*4 + c.mind.cap/500; }
-function mindDraft(S){ if (S.mp < 1 || S.mind.offer) return hook('fail'); S.mp--; const p = MPOOL(S).slice().sort(() => Math.random()-0.5);
-  const seen = {}; S.mind.offer = []; for (const k of p) { if (!seen[k]) { seen[k] = 1; S.mind.offer.push(k); } if (S.mind.offer.length == 3) break; } hook('buy'); }
+function draftOffer(S){ const p = MPOOL(S).slice().sort(() => Math.random()-0.5), seen = {}, o = []; for (const k of p) { if (!seen[k]) { seen[k] = 1; o.push(k); } if (o.length == 3) break; } return o; }
+const dreamNeed = S => 15000*Math.pow(1.7, S.mind.dreams);
+function mindDraft(S){ if (S.mp < 1 || S.mind.offer) return hook('fail'); S.mp--; S.mind.offer = draftOffer(S); S.mind.dreamt = 0; hook('buy'); }
+const TASKS = {idle:['Leak whimsy','The old way. A full Mind leaks whimsy, and nothing else happens.'], ponder:['Ponder','Spare thought becomes notions for the scholars, eight thoughts to a notion.'],
+ coach:['Coach a duty','Spare thought helps one duty team learn faster.'], forecast:['Forecast','The Mind watches the sky. Comets come 30% more often and teach half as much again, and you can see the weather coming.'],
+ dream:['Dream','Spare thought piles up until the Mind dreams up a subsystem of its own, free of Mandate.']};
+function setTask(S, t, duty){ if (!S.done.sparework || !TASKS[t]) return hook('fail'); S.mind.task = t; if (duty != null) S.mind.coach = duty; hook('tap'); }
 function mindTake(S, k, parent){ if (!S.mind.offer || S.mind.offer.indexOf(k) < 0) return; const N = S.mind.nodes;
   N.push({k, lv:1, p: parent == null ? suggestParent(S,k) : parent, cond:1, v:1}); S.mind.offer = null; S.mind.sel = N.length - 1; S.mind.rew = S.age;
   log(S, 'A ' + MT[k].n + ' has been fitted to the Mind, wired to the ' + MT[N[N[N.length-1].p].k].n + '.','good'); hook('unlock'); }
@@ -263,7 +276,15 @@ function mindTick(S, dt, c, online){
   S.r.cycles += inflow*dt; S.r.notions = Math.min(c.caps.notions, S.r.notions + mc.notions*dt);
   if (mc.bilge) S.r.cycles *= Math.pow(1 - 0.0015*mc.bilge, dt);
   const full = S.r.cycles >= mc.cap*0.995; if (S.r.cycles > mc.cap) S.r.cycles = mc.cap;
-  S.r.whimsy += (full ? mc.raw*0.006*(1 + mc.gland) : mc.raw*0.0004*mc.gland) * (qk(S).whim||1) * Math.pow(0.85, S.mind.nodes.filter(n => n.k == 'bureau').length) * dt;
+  const task = S.done.sparework ? md.task : 'idle', busy = full && task != 'idle';
+  S.r.whimsy += (full ? mc.raw*0.006*(1 + mc.gland)*(busy ? 0.25 : 1) : mc.raw*0.0004*mc.gland) * (qk(S).whim||1) * Math.pow(0.85, S.mind.nodes.filter(n => n.k == 'bureau').length) * dt;
+  /* standing work for spare thought: only what overflows a full Mind is spent */
+  const spare = busy ? mc.cps*dt : 0; md.fc = busy && task == 'forecast' ? 1 : 0;
+  if (spare > 0) {
+    if (task == 'ponder') S.r.notions = Math.min(c.caps.notions, S.r.notions + spare/8);
+    if (task == 'coach') { const D = S.duty[md.coach]; if (D && team(S, md.coach).length) D.c = Math.min(100, D.c + spare*0.00006*(1 - D.c/105)); }
+    if (task == 'dream') { md.dream += spare; const need = dreamNeed(S); if (md.dream >= need && !md.offer) { md.dream -= need; md.dreams++; md.offer = draftOffer(S); md.dreamt = 1; log(S,'The Mind has dreamt up a subsystem nobody sent. (Mind)','big'); hook('unlock'); } }
+  }
   md.temp.twitch = 0;
   for (const k in md.temp) if (k != 'twitch' && k != 'giggle' && md.temp[k] > 0) md.temp[k] = Math.max(0, md.temp[k] - dt);
   for (const k in md.sulk) if (md.sulk[k] > 0) md.sulk[k] -= dt;
@@ -366,9 +387,9 @@ function calc(S){
   c.yield = m.yield*(1 + 0.03*J.tinker);
   c.notionsIn = J.scholar*0.1*m.notion*(1 + 0.05*nb(S,'nook')) + nb(S,'obs')*0.1*m.obs;
   c.smelt = nb(S,'smelter')*1*m.smelt; c.kettle = nb(S,'kettle')*m.kettle*(S.mind.temp.teapot > 0 ? 2 : 1); c.mill = nb(S,'mill');
-  c.caps = {lichen:(2000 + 1500*nb(S,'locker') + 500*nb(S,'cellar'))*m.cap*m.lcap, scrap:(100 + 150*nb(S,'locker'))*m.cap,
+  c.caps = {lichen:(2000 + 1500*nb(S,'locker') + 500*nb(S,'cellar'))*m.cap*m.lcap, scrap:scrapCap(S),
     ice:(200 + 100*nb(S,'locker') + 300*nb(S,'cellar'))*m.icecap, notions:(250 + 250*nb(S,'nook')*(m.nook||1) + 2500*nb(S,'obs') + 1500*nb(S,'shelf'))*m.ncap, cycles:c.mind.cap};
-  c.capPop = (2 + (q.berth||0) + m.berth)*nb(S,'hut') + 5*nb(S,'rack');
+  c.capPop = (2 + (q.berth||0) + m.berth)*nb(S,'hut') + m.rackB*nb(S,'rack') + m.warrenB*nb(S,'warren');
   c.capHails = 2 + nb(S,'antenna');
   /* warmth and comfort make up accord */
   const aph = c.cal.i == 2;
@@ -451,7 +472,7 @@ function tick(S, dt, online){
   }
   if (online) {
     if (S.comet > 0) { S.comet -= dt; if (S.comet <= 0 && Math.random() < 0.15*nb(S,'obs')*S.m.obs) observe(S, 'obs'); }
-    else if (pop >= 1 && (S.cometT -= dt) <= 0) { S.comet = 22; S.cometT = rnd(200,380)*(q.comet||1); log(S,'A comet is crossing the sky. Tap Observe.','big'); hook('unlock'); }
+    else if (pop >= 1 && (S.cometT -= dt*(S.mind.fc ? 1.3 : 1)) <= 0) { S.comet = 22; S.cometT = rnd(200,380)*(q.comet||1); log(S,'A comet is crossing the sky. Tap Observe.','big'); hook('unlock'); }
     storyTick(S, dt);
     if (nb(S,'antenna') >= 1) {
       if (S.pedlar > 0) S.pedlar -= dt;
@@ -476,7 +497,7 @@ const festCost = S => ({lichen:200 + 40*S.pop, tea:2 + 0.2*S.pop});
 function festival(S){ const c = festCost(S); if (!S.done.brewing || S.fest > 0 || !canPay(S,c)) return hook('fail'); pay(S,c); S.fest = 400; S.seen.fest = 1; log(S,'A Brew-up! The crew are delighted.','good'); if (cal(S).i == 2) ach('wake'); hook('buy'); }
 function observe(S, by){
   if (S.comet <= 0) return hook('fail'); touch(S);
-  const c = calc(S), g = 20 + 0.12*c.caps.notions; S.comet = 0; S.comets++; add(S,'notions',g,c); add(S,'ice', 10 + c.caps.ice*0.05, c);
+  const c = calc(S), g = (20 + 0.12*c.caps.notions)*(S.mind.fc ? 1.5 : 1); S.comet = 0; S.comets++; add(S,'notions',g,c); add(S,'ice', 10 + c.caps.ice*0.05, c);
   log(S, (by == 'obs' ? 'The observatory caught the comet' : by == 'watch' ? 'The sky-watch observed the comet' : 'You watch the comet with the scholars') + '. +' + Math.round(g) + ' notions and some ice.','good'); if (!by) hook('buy');
   if (S.comets >= 10) ach('comets'); if (S.comets >= 5) marg('m1');
 }
@@ -541,6 +562,10 @@ const CHAINS = [
  {id:'wine',trig:S=>nb(S,'kettle')>=2,steps:[
   {t:'Somebody has left the tea too long. It now has an opinion of its own, and {who} has had three cups.',a:['Allow lichen wine','Accord +6; duties make more mistakes',S=>{S.accMod+=6;S.m.learn*=1.1;S.st.flags.wine=1;},'Lichen wine becomes a fixture. The rota is livelier. So are the spoons.',1],b:['Ban it','Accord −3',S=>{S.accMod-=3;},'Banned. A still appears in a locker within the hour. You choose not to look.',1]},
   {t:'{who} proposes a vintage, aged through a whole Aphelion.',a:['Lay it down','Costs 20 tea; whimsy +40 next spring',S=>{S.r.tea=Math.max(0,S.r.tea-20);S.st.flags.vintage=S.age;},'Twenty jars go into the ice cellar, labelled in a hand that gets worse down the shelf.',-1],b:['Drink it now','Accord +3',S=>{S.accMod+=3;},'There is a party. There is a second party, to recover from the first.',-1]}]},
+ {id:'home',trig:S=>S.pop>=30&&S.done.survey&&S.age>4*3600,steps:[
+  {t:'{who} has painted the inside of their hut. Then the one next door. The crew ask, politely, whether they might arrange the living quarters themselves.',a:['Let them','Unlocks Warrens, dug by the crew',S=>{S.st.flags.homes=1;},'They begin at once, in the old insulation, in shifts, singing. You are not shown the plans.',1],b:['Keep to the plan','Accord \u22123',S=>{S.accMod-=3;},'The paint stays. The plan stays. Everyone is very slightly sulky.',1]},
+  {t:'Two huts have been knocked together overnight. The crew call it the Commons. {who} is standing in the middle of it, looking pleased.',a:['Bless the Commons','Accord +3 for good',S=>{S.accPerm+=3;S.st.flags.homes=1;},'The Commons becomes the place where everything is discussed, and some things are decided.',2],b:['Ask for the wall back','Accord \u22122, 20 plate back',S=>{S.accMod-=2;S.r.plate+=20;},'The wall goes back up, with a door in it, which nobody shuts.',2]},
+  {t:'{who} asks, on behalf of the Commons, for a say in where the next racks go.',a:['Give them a vote','Warrens hold 6; accord +2 for good',S=>{S.m.warrenB=6;S.accPerm+=2;S.st.flags.homes=1;},'The vote takes four hours. The racks go somewhere you would never have thought of, and it is better.',-1],b:['The plan is the plan','Tun-racks hold one more',S=>{S.m.rackB+=1;},'You pack the racks tighter. Efficient. Nobody says anything, which is its own kind of saying something.',-1]}]},
  {id:'tuesday',trig:S=>S.seen.ped&&S.r.whimsy>=10,steps:[
   {t:'Odd Tuesday left a parcel. The label says: OPEN ON A WEDNESDAY.',a:['Wait for Wednesday','Something good, later',S=>{S.st.flags.parcel=1;},'You put it on a shelf. It ticks, faintly, on the hour.',1],b:['Open it now','Whimsy +12',S=>{S.r.whimsy+=12;},'Inside is a smaller parcel. It says OPEN ON A WEDNESDAY. You feel admonished.',1]},
   {t:'It is Wednesday. Probably. The parcel is warm.',a:['Open it','A gift from the pedlar',S=>{S.r.grit+=6;S.r.spores+=3;S.r.footnotes+=2;},'Grit, spores, footnotes, and a note: “For later. You will know.”',-1],b:['Return it','Trades pay better',S=>{S.m.hail*=1.25;},'Odd Tuesday is delighted. Nobody has ever returned one. It tells everyone.',-1]}]}];
@@ -642,6 +667,9 @@ const PRJ = [
  {id:'rivets',tab:'mind',n:'Name every rivet',d:'All 4,180,223 of them. Mandate +2.',c:{whimsy:200},req:S=>S.done.holiday,fx:S=>{S.mp+=2;}},
  {id:'smallprint',tab:'mind',n:'Read the Mandate’s small print',d:'All nine thousand pages of it.',c:{cycles:8000},req:S=>S.done.manual&&S.mand>=8,fx:S=>{log(S,'The small print names a number. It is not a small number.','big');}},
  {id:'index',tab:'mind',n:'Cross-referencing',d:'Every notion, filed under every other notion. Notion storage +50%.',c:{cycles:20000,ledger:10},req:S=>S.done.bookkeeping,fx:mulf('ncap',1.5)},
+ {id:'bunkdesign',tab:'mind',n:'Design denser bunks',d:'The Mind works out how to fold a tardigrade without upsetting it. Tun-racks hold 7.',c:{cycles:12000,plate:80},req:S=>nb(S,'rack')>=4,fx:S=>{S.m.rackB+=2;}},
+ {id:'hammock',tab:'mind',n:'Hammock theory',d:'Slung from the ceiling, swaying gently. Every moss hut holds one more.',c:{cycles:30000,wire:40},req:S=>S.done.bunkdesign&&S.done.springs,fx:S=>{S.m.berth+=1;}},
+ {id:'sparework',tab:'mind',n:'Find the Mind something to do',d:'A full Mind just leaks whimsy. Give it standing work for its spare thought.',c:{cycles:3000},req:S=>S.mind.nodes.length>=4},
  {id:'selfmap',tab:'mind',n:'Map yourself',d:'Shows how much each subsystem thinks, on the diagram.',c:{cycles:2000},req:S=>S.mind.nodes.length>=4},
  {id:'cool1',tab:'mind',n:'Breathe out',d:'The Mind tolerates 50% more heat.',c:{cycles:5000},req:S=>S.seen.glitch>=1,fx:mulf('hcap',1.5)},
  {id:'stay',tab:'mind',n:'Decline the call',d:'Unplug the antenna. Stay on the rock with the crew. This ends the story.',c:{whimsy:400},req:S=>S.done.orbital&&S.accord>=90&&S.pop>=60,fx:S=>endRun(S,'small')},
@@ -731,4 +759,4 @@ function fmtLong(x){ if (x < 1e9) return Math.floor(x).toLocaleString('en-GB'); 
 function fmtTime(s){ s = Math.floor(s); const d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60); return d ? d + 'd ' + h + 'h' : h ? h + 'h ' + m + 'm' : m ? m + 'm ' + (s%60) + 's' : s + 's'; }
 function simulate(S, el){ const steps = Math.min(4000, Math.ceil(el/0.5)), dt = el/steps; for (let i = 0; i < steps; i++) tick(S, dt, false); checks(S); }
 
-if (typeof module != 'undefined') module.exports = {newMeta,newState,calc,tick,checks,simulate,buy,bcost,canPay,stamp,pry,scrape,setJob,festival,festCost,observe,trade,pedlarBuy,nameSession,nameChoose,cycleShare,research,prjOpen,prjCost,endRun,craft,craftMax,upgrade,upgOpen,setKeep,setDuty,team,mindDraft,mindTake,rewire,canWire,nodeUp,nodeUpCost,service,valve,storyChoose,storyStep,BLD,PRJ,PRJ_BY,JOBS,DUTY,CRAFT,UPG,MT,PART,GUIDE,ENDS,QK,fmt,fmtLong,fmtTime,cal,thr,nb,lvl,setM:m=>{M=m;},getM:()=>M,log};
+if (typeof module != 'undefined') module.exports = {setTask,TASKS,dreamNeed,scrapCap,newMeta,newState,calc,tick,checks,simulate,buy,bcost,canPay,stamp,pry,scrape,setJob,festival,festCost,observe,trade,pedlarBuy,nameSession,nameChoose,cycleShare,research,prjOpen,prjCost,endRun,craft,craftMax,upgrade,upgOpen,setKeep,setDuty,team,mindDraft,mindTake,rewire,canWire,nodeUp,nodeUpCost,service,valve,storyChoose,storyStep,BLD,PRJ,PRJ_BY,JOBS,DUTY,CRAFT,UPG,MT,PART,GUIDE,ENDS,QK,fmt,fmtLong,fmtTime,cal,thr,nb,lvl,setM:m=>{M=m;},getM:()=>M,log};

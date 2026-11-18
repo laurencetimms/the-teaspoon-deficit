@@ -9,7 +9,7 @@ const OUT = path.join(__dirname, '..', 'build'), PAGE = 'file://' + path.join(OU
   async function run(name, vp, state, steps) {
     const ctx = await browser.newContext({viewport: vp, deviceScaleFactor: 2, colorScheme: name.includes('dark') ? 'dark' : 'light'});
     const page = await ctx.newPage();
-    page.on('console', m => { if (m.type() == 'error') errs.push(name + ': ' + m.text()); });
+    page.on('console', m => { if (m.type() == 'error' || m.text().startsWith('glok')) errs.push(name + ': ' + m.text()); });
     page.on('pageerror', e => errs.push(name + ' PAGEERROR: ' + e.message + ' | ' + (e.stack||'').split('\n').slice(1,3).join(' | ')));
     if (state) { const o = JSON.parse(fs.readFileSync(path.join(OUT, state))); o.S.t = Date.now(); await page.addInitScript(v => { localStorage.setItem('tsd2.save', v); }, JSON.stringify(o)); }
     await page.goto(PAGE); await page.waitForTimeout(700);
@@ -29,6 +29,11 @@ const OUT = path.join(__dirname, '..', 'build'), PAGE = 'file://' + path.join(OU
     mind_dark: () => run('mind_dark', P, 'state_4h.json', async p => { await p.click('#tab-mind'); await p.evaluate(() => { __tsd.S.mp = 1; __tsd.frameUI(); }); await p.click('text=Requisition a subsystem'); }),
     desk: () => run('desk', D, 'state_9h.json', async p => { await p.click('#tab-mind'); }),
     desk_dark: () => run('desk_dark', D, 'state_9h.json', async p => { await p.click('#tab-crew'); }),
+    sky: () => run('sky_big', P, 'state_9h.json', async p => { await p.evaluate(() => { const S = __tsd.S; S.age = Math.floor(S.age/800)*800 + 450; S.r.scrap = 500; console.log('glok', __tsd.Sky.ok); }); await p.waitForTimeout(300); await p.mouse.click(120, 90); await p.waitForTimeout(800); }),
+    sky_desk: () => run('sky_desk', D, 'state_9h.json', async p => { await p.evaluate(() => { const S = __tsd.S; S.age = Math.floor(S.age/800)*800 + 450; S.r.scrap = 500; }); await p.mouse.click(300, 90); await p.waitForTimeout(800); }),
+    store: () => run('store', P, 'state_9h.json', async p => { await p.click('.r-lichen'); }),
+    hutitem: () => run('hutitem', P, 'state_9h.json', async p => { await p.click('#tab-hull'); await p.click('.item:has(.act:has-text("Moss hut")) .more'); await p.evaluate(() => document.querySelector('.item:has(.more.on)').scrollIntoView()); }),
+    mindtask: () => run('mindtask', P, 'state_9h.json', async p => { await p.click('#tab-mind'); await p.evaluate(() => { const S = __tsd.S; S.mind.task = 'dream'; S.r.cycles = 1e9; __tsd.frameUI(); [...document.querySelectorAll('h2')].find(x => x.textContent == 'Spare thought').scrollIntoView(); }); }),
     walk: () => run('walk', P, 'state_9h.json', async p => { for (const t of ['hull','shop','crew','sci','mind','trade','time','margin','rec']) { if (await p.$('#tab-' + t)) { await p.click('#tab-' + t); await p.waitForTimeout(150); } } }),
   };
   const want = process.argv.slice(2);

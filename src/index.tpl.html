@@ -34,8 +34,10 @@ button:focus-visible,summary:focus-visible,textarea:focus-visible{outline:2px so
 #app{height:100%;display:flex;flex-direction:column;max-width:1180px;margin:0 auto}
 
 /* the window */
-#view{position:relative;flex:none;height:136px;background:#070a10;overflow:hidden;color:#eef2ec}
-#sky{display:block;width:100%;height:100%;cursor:crosshair}
+#view{position:relative;flex:none;height:136px;transition:height .35s ease;cursor:zoom-in;background:#070a10;overflow:hidden;color:#eef2ec}
+#sky{display:block;width:100%;height:100%}
+#view.big{height:62vh;cursor:zoom-out}
+#vcap{left:12px;right:12px;bottom:58px;font:11px/1.5 var(--mono);color:#e7efe9;pointer-events:none;opacity:0;transition:opacity .3s} #view.big #vcap{opacity:1}
 #sky.nogl{background:radial-gradient(120% 90% at 50% 120%,#1b2a22 0 38%,transparent 39%),linear-gradient(#05070d,#0d0c1c)}
 #view::before{content:"";position:absolute;left:0;right:0;bottom:0;height:64px;background:linear-gradient(transparent,#000c);pointer-events:none}
 #view>*:not(#sky){position:absolute;text-shadow:0 1px 3px #000,0 0 8px #000}
@@ -53,8 +55,8 @@ button:focus-visible,summary:focus-visible,textarea:focus-visible{outline:2px so
 
 /* stores */
 #body{flex:1;min-height:0;display:flex;flex-direction:column}
-#res{flex:none;display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--rule);background:var(--panel)}
-.r{padding:4px 8px 5px;border-right:1px solid var(--rule);border-top:1px solid var(--rule);min-width:0}
+#res{flex:none;display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--rule);background:var(--panel)}
+.r{position:relative;display:block;width:100%;text-align:left;padding:4px 8px 6px;border-right:1px solid var(--rule);border-top:1px solid var(--rule);min-width:0}
 .rn{display:flex;justify-content:space-between;gap:6px;font-size:11px;color:var(--mute);white-space:nowrap}
 .rr{font-family:var(--mono);font-size:10.5px}
 .rr[data-s="bad"]{color:var(--bad)}
@@ -93,7 +95,7 @@ p{margin:0}
 .item.hit{animation:hit .25s}
 @keyframes hit{from{background:color-mix(in srgb,var(--accent) 30%,var(--panel))}to{background:var(--panel)}}
 .costs{display:flex;flex-direction:column;gap:1px;font:12px var(--mono);font-variant-numeric:tabular-nums}
-.cost{display:flex;justify-content:space-between;max-width:260px}
+.cost{display:grid;grid-template-columns:minmax(64px,auto) 1fr;gap:12px;max-width:340px} .cv{text-align:right}
 .cost[data-s="ok"] .cv{color:var(--good)} .cost[data-s="no"] .cv{color:var(--ink)} .cost[data-s="cap"] .cv{color:var(--bad)}
 .ctl{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px;color:var(--mute)}
 .ctl-s{font:11px var(--mono)}
@@ -173,10 +175,13 @@ p{margin:0}
 .end-x{font:16px/1.5 var(--serif);text-wrap:pretty}
 .code{width:100%;height:110px;font:11px var(--mono);background:var(--panel);color:var(--ink);border:1px solid var(--rule);border-radius:6px;padding:8px;resize:vertical}
 
-@media (max-width:420px){ .r{padding:3px 6px 4px} .rn{font-size:10px} .rr{font-size:9.5px} .rv{font-size:12.5px} .rc{font-size:9.5px} .opts{grid-template-columns:1fr} }
+@media (max-width:420px){ .opts{grid-template-columns:1fr} }
+.rbar{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);opacity:.55} .r[data-s="full"] .rbar{background:var(--full);opacity:1}
+.tasks{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px} .opt.on,.chip.on{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
 @media (max-width:359px){ #res{grid-template-columns:repeat(3,1fr)} }
 @media (min-width:900px){
   #view{height:190px}
+  #view.big{height:70vh}
   #count{font-size:38px}
   #body{display:grid;grid-template-columns:230px minmax(0,1fr) 310px;grid-template-rows:minmax(0,1fr)}
   #res{display:flex;flex-direction:column;border-bottom:0;border-right:1px solid var(--rule);overflow-y:auto}
@@ -201,6 +206,7 @@ p{margin:0}
     <div class="hud"><h1>The Teaspoon Deficit</h1><div><span id="count">0</span> <span id="count-l">spoons made</span></div></div>
     <div id="date"></div>
     <div class="vr"><div id="deficit" hidden></div></div>
+    <div id="vcap" aria-live="off"></div>
   </section>
   <div id="body">
     <aside id="res" aria-label="Stores"></aside>

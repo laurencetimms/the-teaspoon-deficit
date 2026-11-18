@@ -19,6 +19,8 @@ const OUT = path.join(__dirname, '..', 'build');
   await page.evaluate(() => { __tsd.S.r.scrap = 100; }); await tap('.hand.prime', 40); await page.waitForTimeout(1300); await tap('#tab-mind'); await tap('text=Requisition a subsystem'); await tap('.offer .opt >> nth=0');
   console.log('mind:', JSON.stringify(await st()));
   await page.mouse.click(195, 700); // tap the diagram
+  await page.mouse.click(150, 60); await page.waitForTimeout(500); await page.mouse.click(150, 60); // expand and close the view
+  await tap('.r-cycles'); await tap('.sheet .chip.wide');
   // give it a working colony, then try the story, the workshop and duties
   await page.evaluate(() => { const S = __tsd.S; S.r.notions = 500; S.r.scrap = 400; S.b.nook = 2; S.b.locker = 3; S.done.calendar = S.done.craft = S.done.delegation = S.done.philosophy = 1; for (let i = 0; i < 10; i++) S.crew.push({n:'Test ' + i, t:'clumsy', j:'grazer', x:{}, d:''}); S.b.hut = 6; S.hand.stamp = 200; S.st.cur = {ch:'who', s:0, w:0, age:0}; __tsd.checks(S); __tsd.frameUI(); });
   await tap('#tab-crew'); await tap('.opts .opt >> nth=0');
