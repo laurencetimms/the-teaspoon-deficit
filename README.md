@@ -31,6 +31,7 @@ Any static host will do. For GitHub Pages: Settings → Pages → deploy from th
 | `src/index.tpl.html` | Page shell and styles. |
 | `build.py` | Inlines `src/` into `index.html`, plus `build/test.html` for the tools. |
 | `tools/sim.js` | A headless bot that plays a whole life and prints when each milestone lands. |
+| `tools/harness/` | The test harness: many kinds of simulated player, detectors for deadlocks, walls, grinds and long waits, and an HTML report. |
 | `tools/shot.js`, `tools/play.js` | Browser checks: screenshots at phone and desktop sizes, and a scripted tap-through. |
 
 ## Build and check
@@ -47,6 +48,16 @@ The browser tools need Playwright (`npm i playwright`). They read the state file
 node tools/shot.js               # screenshots into build/
 node tools/play.js               # scripted opening, Mind, a story, a duty, crafting, away time
 ```
+
+## Test harness
+
+```
+node tools/harness/run.js 5      # 5 lives of each player type, in parallel
+```
+
+It writes `build/harness.json` and `build/report.html`. Each player type plays whole lives using the game's own list of legal moves (`actions(S)` in `src/core.js`), with seeded randomness so a run can be repeated. Player types: optimiser, casual (six short sessions a day), never trades, no duties, Mind first, hoarder, random fuzzer, and two story players (always first choice, always second).
+
+Detectors flag crashes, deadlocks (nothing new reachable within six hours), walls (a cost no store can hold, or a store drained below a cost), grinds (one move doing most of the work), long waits, thin choice, waste at full stores and an idle Mind. Each finding carries a save code: in the game, Menu, then Copy or load a save code, to stand at that moment. Test saves skip away-time simulation.
 
 ## Balance notes (stage one)
 

@@ -91,7 +91,7 @@ R.hull = el => {
   for (const id in BLD) { const d = BLD[id]; if (!d.req(S)) continue;
     const fit = fittedOn(id);
     el.append(item('b_'+id, {title:() => d.n + ' (' + nb(S,id) + ')', sub: fit.length ? () => 'Upgraded: ' + fit.join(', ') : null, act:() => buy(S,id,qn()), cost:() => buy1cost(S,id), desc:d.d,
-      more:dd => { const e = h('p','eff'); U(() => setT(e, 'Each: ' + effText(id) + '.')); dd.insertBefore(e, dd.children[1] || null); const pn = h('p','note'); U(() => { const raw = bcost(S,id,1,true); setT(pn, raw.scrap && raw.scrap > buy1cost(S,id).scrap + 1 ? 'You cannot store ' + fmt(raw.scrap) + ' scrap, so the part over 90% of your store is asked in plate instead, 50 scrap to a plate.' : ''); }); dd.append(pn); }})); }
+      more:dd => { const e = h('p','eff'); U(() => setT(e, 'Each: ' + effText(id) + '.')); dd.insertBefore(e, dd.children[1] || null); const pn = h('p','note'); U(() => { const raw = bcost(S,id,1,true); setT(pn, raw.scrap && raw.scrap > buy1cost(S,id).scrap + 1 ? 'You cannot store ' + fmt(raw.scrap) + ' scrap, so the part over 40% of your store is asked in plate instead, 50 scrap to a plate. (Smelters take everything above half.)' : ''); }); dd.append(pn); }})); }
 };
 
 /* ---------- Workshop ---------- */
@@ -459,7 +459,7 @@ function save(cloud){
   S.t = Date.now(); const json = JSON.stringify({S, M}); LS.set(SAVE_KEY, json);
   if (cloud && cloudDoc && !cloudBusy && cloudActs !== (S.acts||0) + S.ended) { cloudBusy = true; cloudActs = (S.acts||0) + S.ended; cloudDoc.set({json, t:S.t}).catch(() => {}).then(() => { cloudBusy = false; }); }
 }
-function adopt(o){ M = Object.assign(newMeta(), o.M); const base = newState(o.S.quirk); S = Object.assign(base, o.S); S.m = Object.assign(newState('').m, o.S.m); S.st = Object.assign(base.st, o.S.st); S.mind = Object.assign(newState('').mind, o.S.mind); welcomeBack(); sig = tabSig = ''; logSeen = null; cur = 'hull'; frameUI(); save(false); }
+function adopt(o){ M = Object.assign(newMeta(), o.M); const base = newState(o.S.quirk); S = Object.assign(base, o.S); S.m = Object.assign(newState('').m, o.S.m); S.st = Object.assign(base.st, o.S.st); S.mind = Object.assign(newState('').mind, o.S.mind); if (S.frozen) { S.frozen = 0; S.t = Date.now(); log(S,'Loaded a test save. Time away was not counted.',''); } welcomeBack(); sig = tabSig = ''; logSeen = null; cur = 'hull'; frameUI(); save(false); }
 function welcomeBack(){
   const el = Math.max(0, (Date.now() - S.t)/1000); if (el < 15) return;
   S.bank = Math.min(10800, S.bank + el/3);
