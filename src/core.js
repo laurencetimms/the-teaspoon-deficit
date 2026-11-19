@@ -68,7 +68,7 @@ function newState(quirk){
     duty:{}, keep:{}, mind:{nodes:[{k:'stem', lv:1, p:-1, cond:1, v:1}], task:'idle', coach:'', dream:0, dreams:0, fc:0, heat:0, offer:null, ct:0, trial:null, sulk:{}, glT:0, sockT:0, temp:{}, sel:0},
     lastAct:0, taste:Math.floor(rand()*3), cand:null, fleet:[], goodNames:0,
     m:{graze:1,bed:1,scav:1,press:1,yield:1,craft:1,smelt:1,notion:1,ice:1,cond:1,kettle:1,warm:1,fuel:1,cap:1,icecap:1,ncap:1,lcap:1,learn:1,comfort:1,hail:1,obs:1,mind:1,hand:1,berth:0,rota:1,stem:1,hcap:1,bunk:1,rackB:5,warrenB:4},
-    tmpm:[], accPerm:0, quirk:quirk||'', heir:hz, log:[], ended:'', bank:0, flux:0, sunTaps:0, _sp:0, _used:0, acts:0};
+    arc:newArc(), here:0, tmpm:[], accPerm:0, quirk:quirk||'', heir:hz, log:[], ended:'', bank:0, flux:0, sunTaps:0, _sp:0, _used:0, acts:0};
   if (hz.small) { S.b.hut = 2; S.b.bed = 1; S.seen.lichen = 1; }
   return S;
 }
@@ -98,7 +98,7 @@ const BLD = {
  garden:{n:'Moss garden',d:'Ornamental lichen. Grown from neighbours’ spores, for looking at.',c:{spores:3,plate:10},k:1.2,e:'comfort +3, +0.4 lichen/s',req:S=>S.done.gardening}};
 const scrapCap = S => (100 + 150*nb(S,'locker') + 1500*nb(S,'bunker')*S.m.bunk)*S.m.cap;
 /* a building never asks for more scrap than 40% of what you can store (smelters take everything above half): the rest is asked in plate, 50 scrap to a plate */
-function bcost(S, id, q, raw){ const d = BLD[id], n = nb(S,id), o = {}; const f = Math.pow(d.k,n) * (Math.pow(d.k,q)-1)/(d.k-1); for (const r in d.c) o[r] = d.c[r]*f;
+function bcost(S, id, q, raw){ const d = BLD[id], n = nb(S,id), o = {}; const f = Math.pow(d.k,n) * (Math.pow(d.k,q)-1)/(d.k-1) * (S.arc && S.arc.boom > S.age ? 0.6 : 1); for (const r in d.c) o[r] = d.c[r]*f;
   if (!raw && o.scrap) { const lim = scrapCap(S)*0.4; if (o.scrap > lim) { o.plate = (o.plate||0) + (o.scrap - lim)/50; o.scrap = lim; } }
   return o; }
 function buy1cost(S, id){ return bcost(S, id, 1); }
@@ -377,7 +377,7 @@ function mindCrew(S, dt, c, T, D, online){
 function calc(S){
   const c = {}, m = S.m, q = qk(S), hz = S.heir, pop = S.pop = S.crew.length, awake = pop - S.tun;
   c.cal = cal(S);
-  c.seasonM = Math.max(0.1, SEASONS[c.cal.i].m + S.weather);
+  c.seasonM = Math.max(0.05, (SEASONS[c.cal.i].m + S.weather)*(1 - 0.7*arcDrift(S)) + (arc(S).sum > S.age ? 0.4 : 0));
   c.am = 0.6 + S.accord/150;
   const f = pop > 0 ? awake/pop*c.am : 0, J = {grazer:0,scav:0,scholar:0,icer:0,tinker:0,bard:0}, Nn = {grazer:0,scav:0,scholar:0,icer:0,tinker:0,bard:0}, Dn = {};
   let hungry = 0, kind = 0;
@@ -404,7 +404,7 @@ function calc(S){
   c.capHails = 2 + nb(S,'antenna');
   /* warmth and comfort make up accord */
   const aph = c.cal.i == 2;
-  c.warmNeed = aph ? pop/8 : 0;
+  const dr = arcDrift(S); c.warmNeed = aph ? pop/8*(1 + dr) : dr > 0.2 ? pop/8*dr : 0;
   c.warm = (S.r.scrap > 1 || !aph ? nb(S,'boiler')*2*m.warm : 0) + (S.st.flags.huddle ? pop/20 : 0);
   c.teaUse = S.r.tea > 0 ? pop*0.0006 : 0;
   const A = [['Settled', 50]];
@@ -418,6 +418,7 @@ function calc(S){
   if (S.fest > 0) A.push(['Brew-up', 10]);
   if (c.warmNeed > c.warm) A.push(['Cold', -Math.min(25, (c.warmNeed - c.warm)*3)]);
   if (S.tun > 0) A.push(['Hunger', -25]);
+  if (inCrisis(S,'obey')) A.push(['Bureau quotas', -Math.min(40, 16 + 4*arc(S).n)]);
   if (Math.abs(S.accMod) >= 0.5) A.push(['Recent decisions (fading)', clamp(S.accMod,-30,30)]);
   if (S.accPerm) A.push(['Customs and comforts', S.accPerm]);
   if (q.acc) A.push(['Bureau attention', q.acc]);
@@ -447,7 +448,7 @@ function tick(S, dt, online){
   if (r.lichen > 0) S.seen.lichen = 1;
   /* scrap, boilers, smelters, presses */
   let inc = c.scrapIn*dt;
-  if (c.cal.i == 2 && nb(S,'boiler')) inc -= nb(S,'boiler')*0.2*S.m.fuel*dt;
+  if ((c.cal.i == 2 || c.warmNeed > 0) && nb(S,'boiler')) inc -= nb(S,'boiler')*0.2*S.m.fuel*dt;
   r.scrap = Math.max(0, r.scrap + inc);
   if (c.smelt > 0 && r.scrap > c.caps.scrap*0.5) { const u = Math.min(r.scrap - c.caps.scrap*0.5, c.smelt*dt); r.scrap -= u; r.plate += u/50; }
   if (c.mill > 0 && r.plate > 0) { const u = Math.min(r.plate, c.mill*0.03*dt); r.plate -= u; r.wire += u/2; }
@@ -459,15 +460,17 @@ function tick(S, dt, online){
   r.ice = Math.min(c.caps.ice, r.ice + c.iceIn*dt);
   if (c.kettle > 0 && r.lichen > c.caps.lichen*0.3) { const k = Math.min(c.kettle*dt, r.lichen/0.5, r.ice/0.2); if (k > 0) { r.lichen -= k*0.5; r.ice -= k*0.2; r.tea += k*0.01; } }
   r.tea = Math.max(0, r.tea - c.teaUse*dt);
-  r.notions = Math.min(c.caps.notions, r.notions + c.notionsIn*dt);
+  { const b = r.notions; r.notions = Math.min(c.caps.notions, r.notions + c.notionsIn*dt); S.tally = S.tally || {}; S.tally.passN = (S.tally.passN||0) + (r.notions - b); }
+  mktTick(S, dt);
   r.whimsy += c.N.bard*0.003*(S.done.ballads ? 3 : 1)*(q.whim||1)*dt;
   mindTick(S, dt, c, online);
   dutiesTick(S, dt, c, online);
+  arcTick(S, dt, c, online);
   /* crew learn their trades */
   const sk = (q.skill||1)*dt;
   for (const t of S.crew) if (!t.d && t.j != 'grazer') t.x[t.j] = (t.x[t.j]||0) + sk*(t.t == 'diligent' ? 1.2 : 1);
   /* arrivals */
-  if (pop < c.capPop && r.lichen > 0 && S.tun == 0) { S.arr += dt/12*(1 + c.capPop/25)*(S.fest>0?2:1); while (S.arr >= 1 && S.crew.length < c.capPop) { S.arr--; addTardi(S); } } else S.arr = 0;
+  if (pop < c.capPop && r.lichen > 0 && S.tun == 0) { S.arr += dt/12*(1 + c.capPop/25)*(S.fest>0?2:1)*(inCrisis(S,'trust') ? (c.cal.i == 2 ? 0 : 1 - arc(S).drift) : arc(S).sum > S.age ? 2 : inCrisis(S,'obey') && S.accord < 50 ? 0.5 : 1); while (S.arr >= 1 && S.crew.length < c.capPop) { S.arr--; addTardi(S); } } else S.arr = 0;
   /* mood, hails, timers */
   S.accord += clamp(c.accT - S.accord, -0.2*dt, 0.2*dt);
   S.accMod *= Math.pow(0.5, dt/5400);
@@ -490,6 +493,95 @@ function tick(S, dt, online){
       else if ((S.pedT -= dt) <= 0 || (new Date().getDay() == 2 && !S.seen.tue)) { S.seen.tue = new Date().getDay() == 2 ? 1 : 0; S.pedlar = 180; S.pedT = rnd(700,1200); if (!S.seen.ped) log(S,'A small crooked ship is hailing you. It says its name is Odd Tuesday. (Trade)','big'); S.seen.ped = 1; }
     }
   }
+}
+
+/* ---------- the arc: Act 1 drift, the Bureau's order at the first antenna, a crisis, the way through ----------
+   Nothing in the crisis advances or does harm unless the player is present: online, and has tapped in the
+   last fifteen minutes. Away, the crew hunker down. Losses are felt (skilled crew leave or freeze) and all
+   of them can be won back. */
+const HERE = 900, QLEN = 900;
+const present = (S, online) => !!online && S.age - (S.here||0) < HERE;
+function newArc(){ return {ph:0, route:'', ct:0, drift:0, frost:0, strain:0, fore:0, n:0, q:null, miss:0, met:0, lost:0, iced:[], gone:[], files:[], unread:0, sum:0, r0:0}; }
+const arc = S => S.arc || (S.arc = newArc());
+const inCrisis = (S, route) => { const a = arc(S); return a.ph == 2 && (!route || a.route == route); };
+const arcOpen = S => { const a = arc(S); return a.ph == 1 || a.ph == 2; };
+const arcDrift = S => inCrisis(S,'trust') ? arc(S).drift : 0;
+function dispatch(S, id, t, x, ask){ const a = arc(S); if (a.files.some(f => f.id == id)) return; a.files.push({id, a:S.age, t, x, ask:!!ask}); a.unread++; log(S, 'A dispatch from the Bureau: ' + t + '. (Records)', 'big'); hook('dispatch', id); }
+const FORE = [
+ [3600, 'The Mind reports that this Aphelion is colder than the last. Very slightly. It has made a note.'],
+ [9000, '{who} says the frost on the shadow side is thicker this year. The icers are pleased. Nobody else is.'],
+ [14400, 'The Mind has started counting the days of each Aphelion. It will not say why. It counts out loud.']];
+const DIRECTIVE = ['Directive 7/ORB: on the matter of your orbit',
+ 'Your new antenna has put you back on our register. Our instruments show that the body to which you are attached is drifting outward, at a rate the Bureau considers untidy.\n\nYou are directed to burn your reserves at once to correct course. Scrap, plate and wire are to be fed to the manoeuvring jets, and the crew’s quarters may be stripped for metal as required. A quota of spoons will follow, so that the cost is recovered.\n\nShould you decline, the Bureau will note it, and the orbit will do what orbits do.\n\nRespond by return.'];
+function arcChoose(S, r){
+  const a = arc(S); if (a.ph != 1 || (r != 'obey' && r != 'trust')) return hook('fail');
+  a.ph = 2; a.route = r; a.ct = 0; a.r0 = Math.max(2, S._sp || 0); touch(S);
+  if (r == 'obey') {
+    a.burnt = {}; for (const k of ['scrap','plate','wire']) { a.burnt[k] = S.r[k]*0.5; S.r[k] *= 0.5; }
+    const h = Math.floor(nb(S,'hut')*0.25); if (h > 0) S.b.hut -= h; a.huts = h;
+    a.q = {n:0, t:0, base:S.made, target:qTarget(S,0)};
+    log(S, 'The jets burn half the scrap, plate and wire on board. ' + (h ? h + ' huts are stripped for metal. ' : '') + 'The orbit steadies. The first quota arrives on the same breath.', 'bad');
+    dispatch(S, 'quota', 'Quota notice', 'Your compliance is noted with approval.\n\nA quota of spoons is now in force. Each period, a target will be set a little above the last. Meet it, and the Bureau will say nothing. Miss it, and the Bureau will take what it is owed.\n\nThe Bureau reminds you that morale is not a resource.');
+  } else {
+    S.accMod += 8;
+    log(S, 'You tell the crew the truth: the rock is drifting, and you will not strip the ship to stop it. They take it well, for now. Each year will be longer and colder until you find a way to correct course yourselves.', 'bad');
+  }
+  hook('unlock');
+}
+const qTarget = (S, n) => arc(S).r0*QLEN*Math.pow(1.09, n);
+function arcTick(S, dt, c, online){
+  const a = arc(S), here = present(S, online);
+  /* Act 1: the foreshadowing, a few Aphelions in */
+  if (a.ph == 0) {
+    if (online && a.fore < FORE.length && S.age > FORE[a.fore][0] && c.cal.i == 2 && a.foreY !== c.cal.year && S.crew.length) { a.foreY = c.cal.year; log(S, FORE[a.fore][1].replace('{who}', pick(S.crew).n), ''); a.fore++; }
+    if (nb(S,'antenna') >= 1 && !S.done.orbital && !S.seen.stage2) { a.ph = 1; dispatch(S, 'directive', DIRECTIVE[0], DIRECTIVE[1], true); }
+    return; }
+  if (a.ph == 3) { a.strain = Math.max(0, a.strain - dt*0.5); if (a.iced.length && S.crew.length < Math.max(c.capPop*1.6, c.capPop + 12) && (a.sum > S.age || rand() < 0.3)) thaw(S, c); return; }
+  if (a.ph != 2) { a.strain = 0; return; }
+  const pop = S.crew.length;
+  if (here) a.ct += dt;                  /* away, or not tapping: the crew hunker down, and nobody is harmed */
+  if (a.route == 'trust') {
+    a.dt = (a.dt||0) + dt*(here ? 1 : 0.5);   /* the rock drifts on while you are away, at half pace */
+    a.drift = Math.min(0.85, 0.6*Math.min(1, a.dt/10800) + 0.25*Math.max(0, Math.min(1, (a.dt - 10800)/10800)));
+    const def = c.warmNeed > 0 ? Math.max(0, c.warmNeed - c.warm)/c.warmNeed : 0;
+    const dark = c.cal.i == 2;
+    a.strain = 100*clamp(0.4*a.drift/0.85 + 0.45*def*Math.min(1, a.drift/0.4) + 0.25*(S.tun/Math.max(1,pop)), 0, 1);
+    if (!here) return;
+    a.frost = Math.max(0, a.frost + (def > 0.15 ? def*Math.min(1, a.drift/0.5)*(dark ? 1.6 : 0.25) : -0.5)*dt);
+    if (a.frost > 45*(1 + a.iced.length/20) && pop > 8) { a.frost = 0; freeze(S); }
+  } else {
+    const q = a.q, got0 = S.made - q.base;
+    if (!here) { a.strain = 100*clamp(0.3*Math.min(1, a.n/8) + 0.45*clamp((70 - S.accord)/40, 0, 1) + 0.25*clamp(1 - got0/Math.max(1, q.target*q.t/QLEN), 0, 1), 0, 1); return; }
+    q.t += dt; const got = S.made - q.base;
+    if (q.t >= QLEN) {
+      if (got >= q.target) { a.met++; S.accMod += 2; log(S, 'Quota ' + (q.n+1) + ' met: ' + fmt(got) + ' spoons. The Bureau says nothing, which is the point.', 'good'); }
+      else { a.miss++; const t0 = S.r.tea*0.3, p0 = S.r.plate*0.15; S.r.tea -= t0; S.r.plate -= p0; S.accMod -= 8;
+        if (a.miss == 1) dispatch(S, 'reprimand', 'Reprimand', 'Your output for the period fell short of the quota. The difference has been collected in tea and plate, which the Bureau finds a reasonable exchange rate.\n\nThe next target has already been set.');
+        log(S, 'Quota ' + (q.n+1) + ' missed (' + fmt(got) + ' of ' + fmt(q.target) + '). The Bureau takes tea and plate in lieu. The crew watch it go.', 'bad'); }
+      q.n++; q.t = 0; q.base = S.made; q.target = qTarget(S, q.n); a.n = q.n; }
+    const unrest = clamp((70 - S.accord)/40, 0, 1), behind = clamp(1 - got/Math.max(1, q.target*q.t/QLEN), 0, 1);
+    if (unrest > 0.3 && pop > 8) { a.frost += unrest*dt; if (a.frost > 120*(1 + a.gone.length/10)) { a.frost = 0; walkout(S); } } else a.frost = Math.max(0, a.frost - dt);
+    a.strain = 100*clamp(0.3*Math.min(1, a.n/8) + 0.45*unrest + 0.25*behind, 0, 1);
+  }
+}
+function pickCrew(S){ const ok = S.crew.map((t,i) => i).filter(i => S.crew[i].t != 'steady'); const pool = ok.length ? ok : S.crew.map((t,i) => i); return pool[Math.floor(rand()*pool.length)]; }
+function freeze(S){ const a = arc(S), i = pickCrew(S), t = S.crew.splice(i, 1)[0]; a.iced.push(t); a.lost++; S.tun = Math.min(S.tun, S.crew.length);
+  log(S, t.n + ' has frozen solid in the night, curled into a tun so deep that nobody can wake them. They are carried to the cold store, in case.', 'bad'); hook('fail'); }
+function walkout(S){ const a = arc(S), i = pickCrew(S), t = S.crew.splice(i, 1)[0]; a.gone.push(t); a.lost++; S.tun = Math.min(S.tun, S.crew.length);
+  log(S, t.n + ' has left the ship on a passing ore-barge. They took a spoon, and the crew pretend not to have noticed.', 'bad'); hook('fail'); }
+function thaw(S, c){ const a = arc(S); if (rand() < (a.sum > S.age ? 0.12 : 0.02)) { const t = a.iced.shift(); S.crew.push(t); log(S, t.n + ' has thawed out in the warm and gone straight back to work, as if nothing happened.' + (S.crew.length > calc(S).capPop ? ' They are sleeping in a corridor for now.' : ''), 'good'); } }
+function arcResolve(S){
+  const a = arc(S); if (a.ph != 2) return; a.ph = 3; a.res = S.age;
+  S.m.notion *= 1.4; a.boom = S.age + 6*4*seasonLen(S); const fr = S.done.survey ? 2 : 0; if (fr) S.b.rack = nb(S,'rack') + fr; a.racks = fr;
+  if (a.route == 'trust') { a.drift = 0; a.sum = S.age + 4*4*seasonLen(S); S.mp += 2;
+    dispatch(S, 'nominal', 'Notice of orbital correction', 'The Bureau observes that your orbit has returned to nominal. The Bureau takes full credit.\n\nTwo units of Mandate have been released to you, in recognition of the Bureau’s foresight.');
+    log(S, 'The burn holds. The rock swings back towards the sun. A Long Summer begins, and the cold store starts to drip.' + (a.racks ? ' The crew, giddy with warmth, build two tun-racks in an afternoon.' : ''), 'big'); }
+  else { a.q = null; S.accPerm += 8; tmpMul(S, 'press', 1.3, 4*4*seasonLen(S)); S.mp += 2; const c = calc(S);
+    for (const k in a.burnt||{}) add(S, k, a.burnt[k], c); if (a.huts) S.b.hut += a.huts;
+    dispatch(S, 'amend', 'Amendment to the quota', 'The Bureau has received your Charter. It is in crayon.\n\nOn reflection, the Bureau finds that a crew that has agreed to work produces more than one that has been told to. The quota is suspended, pending a review that will not take place. Your reserves are returned, with the Bureau’s compliments, and your huts may be put back.\n\nTwo units of Mandate are released to you. The Bureau would prefer that you did not tell anyone about this.');
+    const back = Math.ceil(a.gone.length/2); for (let k = 0; k < back; k++) S.crew.push(a.gone.shift());
+    log(S, 'The quota is lifted. The crew sign the Charter one by one, and pin it up in the Commons.' + (back ? ' ' + back + ' of the crew who left come back to read it.' : '') + (a.racks ? ' The Commons builds two tun-racks to celebrate, unasked.' : ''), 'big'); }
+  hook('unlock');
 }
 
 /* ---------- player actions ---------- */
@@ -528,13 +620,28 @@ const PART = {
  choir:{n:'The Gravel Choir',d:'They eat cutlery and sing while they do it. They pay in grit, which nobody else has. Hungriest at Aphelion.',ant:1,cost:S=>({spoons:250 + 25*S.stand.choir}),give:(S,c)=>({grit:(2 + Math.floor(S.stand.choir/4))*(c.cal.i==2?2:1), scrap:c.caps.scrap*0.25})},
  bloom:{n:'The Slow Bloom',d:'A ship that grew. Trades spores for tea. Spores grow moss gardens.',ant:2,cost:S=>({tea:5, spoons:200}),give:(S,c)=>({spores:1 + Math.floor(S.stand.bloom/4), lichen:c.caps.lichen*0.2})},
  quorate:{n:'The Quorate',d:'They sell footnotes, and only for ledgers. Some discoveries cannot be made without the footnotes.',ant:3,cost:S=>({ledger:2}),give:(S,c)=>({footnotes:1 + Math.floor(S.stand.quorate/5), notions:c.caps.notions*0.1})}};
+/* The neighbours remember. Appetite: how keen they are on what you offer; it falls with each trade and
+   recovers slowly, and it scales the bulk goods they give. Stock: how much of their speciality they hold;
+   buying it down raises its price until they restock. Each is keenest in one season and coolest in the opposite. */
+const MKT = {choir:{fav:2, ap:0.15, rec:1800, st:0.2, rs:1200}, bloom:{fav:0, ap:0.15, rec:1800, st:0.2, rs:1200}, quorate:{fav:1, ap:0.22, rec:3600, st:0.25, rs:1800}};
+const SPEC = {choir:'grit', bloom:'spores', quorate:'footnotes'};
+function mk(S, id){ if (!S.mkt) S.mkt = {}; return S.mkt[id] || (S.mkt[id] = {ap:1, st:1, n:0}); }
+function mktTick(S, dt){ for (const id in MKT) { const m = mk(S,id), D = MKT[id]; m.ap = Math.min(1, m.ap + dt/D.rec*(id == 'quorate' && S.st.flags.auditor ? 2 : 1)); m.st = Math.min(1, m.st + dt/D.rs); } }
+const favM = (S, id) => { const i = cal(S).i, f = MKT[id].fav; return i == f ? 1.5 : i == (f+2)%4 ? 0.7 : 1; };
+const priceM = (S, id) => { const s = mk(S,id).st; return 1 + 2*(1-s)*(1-s); };
+function tradeCost(S, id){ const c = PART[id].cost(S), k = priceM(S,id), o = {}; for (const r in c) o[r] = r == 'ledger' || r == 'tea' ? Math.ceil(c[r]*k) : Math.round(c[r]*k); return o; }
+function tradeGive(S, id, c){ const g = PART[id].give(S,c), k = mk(S,id).ap*favM(S,id), o = {}; for (const r in g) o[r] = r == SPEC[id] ? g[r] : g[r]*k; return o; }
+const MOOD = a => a > 0.8 ? 'keen' : a > 0.5 ? 'interested' : a > 0.25 ? 'politely bored' : 'fed up';
+const STOCK = s => s > 0.8 ? 'plenty' : s > 0.45 ? 'some' : 'scarce';
 function trade(S, id){
-  const p = PART[id], c = calc(S), cost = p.cost(S);
+  const p = PART[id], c = calc(S), cost = tradeCost(S,id), D = MKT[id], m = mk(S,id);
   if (nb(S,'antenna') < p.ant || S.hails < 1 || !canPay(S,cost)) return hook('fail');
+  const g = tradeGive(S,id,c), wq = qk(S).trade || 1, parts = [], tired = m.ap < 0.4;
   pay(S,cost); S.hails--; S.traded[id] = 1; S.stand[id] = Math.min(20, S.stand[id] + 1);
-  const g = p.give(S,c), m = qk(S).trade || 1, parts = [];
-  for (const r in g) { const x = r == 'grit' || r == 'spores' || r == 'footnotes' ? Math.round(g[r]*m) : g[r]*m; add(S,r,x,c); parts.push(fmt(x) + ' ' + r); }
-  log(S, p.n + ' take your offering and leave ' + parts.join(' and ') + '.', 'good'); touch(S); hook('buy');
+  m.ap = Math.max(0.1, m.ap - D.ap); m.st = Math.max(0, m.st - D.st); m.n++;
+  for (const r in g) { const x = r == 'grit' || r == 'spores' || r == 'footnotes' ? Math.round(g[r]*wq) : g[r]*wq; const b = S.r[r]||0; add(S,r,x,c); if (r == 'notions') { S.tally = S.tally || {}; S.tally.tradeN = (S.tally.tradeN||0) + (S.r[r] - b); } parts.push(fmt(x) + ' ' + r); }
+  const aside = id == 'quorate' && tired ? ' They have told you this already.' : tired ? ' They seem to have had enough of you for now.' : '';
+  log(S, p.n + ' take your offering and leave ' + parts.join(' and ') + '.' + aside + (id == 'quorate' && S.st.flags.auditor == 1 ? ' The auditor nods.' : ''), 'good'); touch(S); hook('buy');
   if (S.traded.choir && S.traded.bloom && S.traded.quorate) ach('trader');
 }
 const PED = [['grit',3,15],['spores',2,20],['footnotes',1,40]];
@@ -577,6 +684,10 @@ const CHAINS = [
   {t:'{who} has painted the inside of their hut. Then the one next door. The crew ask, politely, whether they might arrange the living quarters themselves.',a:['Let them','Unlocks Warrens, dug by the crew',S=>{S.st.flags.homes=1;},'They begin at once, in the old insulation, in shifts, singing. You are not shown the plans.',1],b:['Keep to the plan','Accord \u22123',S=>{S.accMod-=3;},'The paint stays. The plan stays. Everyone is very slightly sulky.',1]},
   {t:'Two huts have been knocked together overnight. The crew call it the Commons. {who} is standing in the middle of it, looking pleased.',a:['Bless the Commons','Accord +3 for good',S=>{S.accPerm+=3;S.st.flags.homes=1;},'The Commons becomes the place where everything is discussed, and some things are decided.',2],b:['Ask for the wall back','Accord \u22122, 20 plate back',S=>{S.accMod-=2;S.r.plate+=20;},'The wall goes back up, with a door in it, which nobody shuts.',2]},
   {t:'{who} asks, on behalf of the Commons, for a say in where the next racks go.',a:['Give them a vote','Warrens hold 6; accord +2 for good',S=>{S.m.warrenB=6;S.accPerm+=2;S.st.flags.homes=1;},'The vote takes four hours. The racks go somewhere you would never have thought of, and it is better.',-1],b:['The plan is the plan','Tun-racks hold one more',S=>{S.m.rackB+=1;},'You pack the racks tighter. Efficient. Nobody says anything, which is its own kind of saying something.',-1]}]},
+ {id:'auditor',trig:S=>S.mkt&&S.mkt.quorate&&S.mkt.quorate.n>=8,steps:[
+  {t:'A small grey craft docks without asking. It is from the Quorate. It is an auditor, and it would like to see the ledgers.',a:['Open the books','Quorate standing +3',S=>{S.stand.quorate=Math.min(20,S.stand.quorate+3);},'The auditor reads every ledger twice, then once more upside down. It says nothing. It writes a great deal.',1],b:['Plead ignorance','Whimsy +15; the Quorate go off you',S=>{S.r.whimsy+=15;mk(S,'quorate').ap*=0.5;},'“Spoons?” you say. “What spoons?” The auditor writes that down too.',1]},
+  {t:'The auditor has found a discrepancy. It is in the auditor’s favour, and the auditor is upset about it. It asks whether it might stay until it has worked it out.',a:['Give it a berth','The Quorate forget twice as fast',S=>{S.st.flags.auditor=1;},'It moves into a locker with a desk the size of a biscuit. Every so often it says “Hm”, and the crew stop to listen.',2],b:['Send it home','Footnotes +3',S=>{S.r.footnotes+=3;},'It leaves a crate of footnotes as a deposit against future discrepancies.',-1]},
+  {t:'{who} has been helping the auditor. They have started a ledger of their own. It is mostly about the auditor.',a:['Let them','Accord +3',S=>{S.accMod+=3;},'The ledger runs to four volumes. The auditor has read all of them and corrected the spelling.',-1],b:['Ask for a copy','Notions +20%',S=>{const c=calc(S);add(S,'notions',c.caps.notions*0.2,c);},'The copy is more useful than either of them intended. The scholars pass it round.',-1]}]},
  {id:'tuesday',trig:S=>S.seen.ped&&S.r.whimsy>=10,steps:[
   {t:'Odd Tuesday left a parcel. The label says: OPEN ON A WEDNESDAY.',a:['Wait for Wednesday','Something good, later',S=>{S.st.flags.parcel=1;},'You put it on a shelf. It ticks, faintly, on the hour.',1],b:['Open it now','Whimsy +12',S=>{S.r.whimsy+=12;},'Inside is a smaller parcel. It says OPEN ON A WEDNESDAY. You feel admonished.',1]},
   {t:'It is Wednesday. Probably. The parcel is warm.',a:['Open it','A gift from the pedlar',S=>{S.r.grit+=6;S.r.spores+=3;S.r.footnotes+=2;},'Grit, spores, footnotes, and a note: “For later. You will know.”',-1],b:['Return it','Trades pay better',S=>{S.m.hail*=1.25;},'Odd Tuesday is delighted. Nobody has ever returned one. It tells everyone.',-1]}]}];
@@ -664,7 +775,9 @@ const PRJ = [
  {id:'tess',tab:'sci',n:'Tessellation',d:'Things fit together better than you thought. Unlocks better lockers.',c:{notions:37500,spring:10},req:S=>S.done.gears},
  {id:'etiquette',tab:'sci',n:'Etiquette',d:'A formal theory of not being awful. Accord +5.',c:{notions:45000,footnotes:2},req:S=>S.done.philosophy&&nb(S,'antenna')>=3,fx:S=>{S.accPerm+=5;}},
  {id:'oneiro',tab:'sci',n:'Oneirology',d:'The study of dreams, including the Mind’s. Four strange new kinds of subsystem.',c:{notions:55000,footnotes:5},req:S=>S.done.hydraulics&&nb(S,'antenna')>=3},
- {id:'orbital',tab:'sci',n:'Orbital mechanics',d:'Where this rock is going, and where it could go instead.',c:{notions:50000,lens:10,ledger:5},req:S=>S.done.astronomy&&S.done.chronology},
+ {id:'drift',tab:'sci',n:'Measure the drift',d:'The rock is falling outward, and a rock can be pushed. Unlocks a thruster.',c:{notions:4000,lens:2},req:S=>inCrisis(S,'trust')||S.done.drift},
+ {id:'unions',tab:'sci',n:'Collective bargaining',d:'The crew learn the word “we”. Unlocks the Charter.',c:{notions:4000},req:S=>inCrisis(S,'obey')||S.done.unions},
+ {id:'orbital',tab:'sci',n:'Orbital mechanics',d:'Where this rock is going, and where it could go instead.',c:{notions:50000,lens:10,ledger:5},req:S=>S.done.astronomy&&S.done.chronology&&!arcOpen(S)},
  {id:'ignition',tab:'sci',n:'Ignition theory',d:'How to start an engine that has been cold for nine thousand years.',c:{notions:65000,gear:30,footnotes:15},req:S=>S.done.orbital&&S.done.gears},
 
  {id:'manual',tab:'mind',n:'Read your own manual',d:'There is one. It has margins, and somebody has been writing in them. Opens the Margin.',c:{cycles:150},req:S=>1},
@@ -685,6 +798,10 @@ const PRJ = [
  {id:'selfmap',tab:'mind',n:'Map yourself',d:'Shows how much each subsystem thinks, on the diagram.',c:{cycles:2000},req:S=>S.mind.nodes.length>=4},
  {id:'cool1',tab:'mind',n:'Breathe out',d:'The Mind tolerates 50% more heat.',c:{cycles:5000},req:S=>S.seen.glitch>=1,fx:mulf('hcap',1.5)},
  {id:'stay',tab:'mind',n:'Decline the call',d:'Unplug the antenna. Stay on the rock with the crew. This ends the story.',c:{whimsy:400},req:S=>S.done.orbital&&S.accord>=90&&S.pop>=60,fx:S=>endRun(S,'small')},
+ {id:'thruster',tab:'mind',n:'Bolt a thruster to the rock',d:'Spoon handles, a spring and a great deal of optimism, aimed backwards.',c:{plate:50,wire:15,lens:2},req:S=>S.done.drift&&(inCrisis(S,'trust')||S.done.thruster)},
+ {id:'burn',tab:'mind',n:'Correction burn',d:'Push the rock back towards the sun. This ends the Long Dark.',c:{cycles:6000,plate:50},req:S=>S.done.thruster&&(inCrisis(S,'trust')||S.done.burn),fx:S=>arcResolve(S)},
+ {id:'charter',tab:'mind',n:'Draft the Charter of the Commons',d:'What the crew will do, and what they will not, written large enough for everyone to lick.',c:{whimsy:80,plate:25},req:S=>S.done.unions&&(inCrisis(S,'obey')||S.done.charter)},
+ {id:'petition',tab:'mind',n:'Send the Charter to the Bureau',d:'Through proper channels, with footnotes. This ends the quota.',c:{cycles:6000,plate:50},req:S=>S.done.charter&&(inCrisis(S,'obey')||S.done.petition),fx:S=>arcResolve(S)},
  {id:'engine',tab:'mind',n:'Reignite the engine',d:'Leave the rock. The end of stage one.',c:{cycles:25000,gear:40,plate:600},req:S=>S.done.ignition,fx:S=>{S.seen.stage2=1;log(S,'The engine coughs, and catches, and then you remember you have not built the next part yet. (End of stage one.)','big');ach('stage1');}}];
 const PRJ_BY = {}; PRJ.forEach(p => PRJ_BY[p.id] = p);
 const prjCost = (S,p) => { const f = p.cf ? p.cf(S) : 1; if (f == 1) return p.c; const o = {}; for (const r in p.c) o[r] = p.c[r]*f; return o; };
@@ -774,6 +891,7 @@ function simulate(S, el){ const steps = Math.min(4000, Math.ceil(el/0.5)), dt = 
 /* ---------- every legal move, for the test harness ---------- */
 function actions(S){
   const L = [], A = (id, kind, cost, run, can) => L.push({id, kind, cost: cost || {}, run, can: can == null ? canPay(S, cost || {}) : can});
+  if (arc(S).ph == 1) { A('arc:obey','story',null,() => arcChoose(S,'obey')); A('arc:trust','story',null,() => arcChoose(S,'trust')); }
   A('stamp','hand',{scrap:1},() => stamp(S)); A('pry','hand',null,() => pry(S)); A('scrape','hand',null,() => scrape(S));
   for (const k in BLD) if (BLD[k].req(S)) A('b:'+k,'build',buy1cost(S,k),() => buy(S,k,1));
   for (const k in CRAFT) if (CRAFT[k].req(S)) A('c:'+k,'craft',CRAFT[k].c,() => craft(S,k,1));
@@ -792,7 +910,7 @@ function actions(S){
   if (md.nodes.length > 2) A('m:wire','mind',null,() => { const N = md.nodes, i = 1 + Math.floor(rand()*(N.length-1)), o = N.map((_,j) => j).filter(j => canWire(N,i,j)); if (o.length) rewire(S,i,pick(o)); }, true);
   if (S.done.sparework) for (const t in TASKS) A('m:task:'+t,'mind',null,() => setTask(S,t, t == 'coach' ? (Object.keys(S.duty).find(k => team(S,k).length) || '') : null), md.task != t);
   if (S.st.cur) { A('s:0','story',null,() => storyChoose(S,0),true); A('s:1','story',null,() => storyChoose(S,1),true); }
-  for (const id in PART) if (nb(S,'antenna') >= PART[id].ant) A('t:'+id,'trade',PART[id].cost(S),() => trade(S,id), S.hails >= 1 && canPay(S, PART[id].cost(S)));
+  for (const id in PART) if (nb(S,'antenna') >= PART[id].ant) A('t:'+id,'trade',tradeCost(S,id),() => trade(S,id), S.hails >= 1 && canPay(S, tradeCost(S,id)));
   if (S.pedlar > 0) { for (const [r,n,w] of PED) A('ped:'+r,'trade',{whimsy:w},() => pedlarBuy(S,r)); if (!M.guide.m3) A('ped:antique','trade',{spoons:1000},() => pedlarBuy(S,'antique')); }
   if (S.done.brewing) A('fest','crew',festCost(S),() => festival(S), S.fest <= 0 && canPay(S, festCost(S)));
   if (S.comet > 0) A('obs','sky',null,() => observe(S),true);
@@ -803,4 +921,4 @@ function actions(S){
 }
 const BASE = ['lichen','scrap','spoons','ice','notions','cycles','whimsy','tea','plate','wire'];
 
-if (typeof module != 'undefined') module.exports = {CRAFT_IDS:Object.keys(CRAFT),storyStep:typeof storyStep!='undefined'?storyStep:null,setSeed,actions,BASE,PED,team,STORY:CHAINS,setHook:f=>{hook=f;},setTask,TASKS,dreamNeed,scrapCap,newMeta,newState,calc,tick,checks,simulate,buy,bcost,canPay,stamp,pry,scrape,setJob,festival,festCost,observe,trade,pedlarBuy,nameSession,nameChoose,cycleShare,research,prjOpen,prjCost,endRun,craft,craftMax,upgrade,upgOpen,setKeep,setDuty,team,mindDraft,mindTake,rewire,canWire,nodeUp,nodeUpCost,service,valve,storyChoose,storyStep,BLD,PRJ,PRJ_BY,JOBS,DUTY,CRAFT,UPG,MT,PART,GUIDE,ENDS,QK,fmt,fmtLong,fmtTime,cal,thr,nb,lvl,setM:m=>{M=m;},getM:()=>M,log};
+if (typeof module != 'undefined') module.exports = {arc,arcChoose,arcResolve,newArc,present,inCrisis,arcOpen,MKT,mk,tradeCost,tradeGive,favM,CRAFT_IDS:Object.keys(CRAFT),storyStep:typeof storyStep!='undefined'?storyStep:null,setSeed,actions,BASE,PED,team,STORY:CHAINS,setHook:f=>{hook=f;},setTask,TASKS,dreamNeed,scrapCap,newMeta,newState,calc,tick,checks,simulate,buy,bcost,canPay,stamp,pry,scrape,setJob,festival,festCost,observe,trade,pedlarBuy,nameSession,nameChoose,cycleShare,research,prjOpen,prjCost,endRun,craft,craftMax,upgrade,upgOpen,setKeep,setDuty,team,mindDraft,mindTake,rewire,canWire,nodeUp,nodeUpCost,service,valve,storyChoose,storyStep,BLD,PRJ,PRJ_BY,JOBS,DUTY,CRAFT,UPG,MT,PART,GUIDE,ENDS,QK,fmt,fmtLong,fmtTime,cal,thr,nb,lvl,setM:m=>{M=m;},getM:()=>M,log};

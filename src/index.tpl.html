@@ -13,6 +13,7 @@
   --console:#0a0e0d; --console-ink:#c9dccf; --console-dim:#6f8177;
   --m-core:#d9d3c2; --m-prod:#e8b04a; --m-store:#8fb5d9; --m-amp:#c99ae0; --m-cool:#7fd3c6; --m-conv:#e6909a; --m-odd:#b8d47a;
   --pipe-o:#4a5650; --pipe-i:#a7b2ab;
+  --memo:#f4eedb;
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
   --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,"Liberation Mono",monospace;
@@ -20,11 +21,11 @@
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ color-scheme:dark;
   --paper:#0e1412; --panel:#141c19; --ink:#dde6df; --mute:#8a9990; --rule:#2a3631;
   --accent:#4dc3a9; --accent-ink:#05201a;
-  --full:#f0a23a; --bad:#ff7d70; --good:#6fd08c; --notion:#82b2ff; --whim:#e78cd8; --pipe-o:#56635c; --pipe-i:#2b3530; } }
+  --full:#f0a23a; --bad:#ff7d70; --good:#6fd08c; --notion:#82b2ff; --whim:#e78cd8; --pipe-o:#56635c; --pipe-i:#2b3530; --memo:#26231a; } }
 :root[data-theme="dark"]{ color-scheme:dark;
   --paper:#0e1412; --panel:#141c19; --ink:#dde6df; --mute:#8a9990; --rule:#2a3631;
   --accent:#4dc3a9; --accent-ink:#05201a;
-  --full:#f0a23a; --bad:#ff7d70; --good:#6fd08c; --notion:#82b2ff; --whim:#e78cd8; --pipe-o:#56635c; --pipe-i:#2b3530; }
+  --full:#f0a23a; --bad:#ff7d70; --good:#6fd08c; --notion:#82b2ff; --whim:#e78cd8; --pipe-o:#56635c; --pipe-i:#2b3530; --memo:#26231a; }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{background:var(--paper);color:var(--ink);font:15px/1.4 var(--sans);overflow:hidden;-webkit-text-size-adjust:100%}
@@ -195,6 +196,24 @@ p{margin:0}
   #log p{margin-bottom:5px}
 }
 @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+
+/* the Bureau's dispatches and the crisis banner */
+.sheet.memo{background:var(--memo);border-radius:2px;box-shadow:0 1px 0 var(--rule),0 12px 40px #0006;position:relative;padding:22px 20px 18px;gap:12px}
+.memo .lh{margin:0;font:700 11px/1.2 var(--mono);letter-spacing:.22em;text-transform:uppercase;text-align:center;border-bottom:3px double var(--ink);padding-bottom:10px}
+.memo .ref{margin:0;font:12px/1.3 var(--mono);color:var(--mute);text-align:center}
+.memo h2{font:700 21px/1.2 var(--serif)}
+.memo .mx{margin:0;font:16px/1.5 var(--serif)}
+.memo .stamp{align-self:flex-end;transform:rotate(-7deg);border:2.5px solid var(--ink);color:var(--ink);font:700 13px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;padding:7px 10px;border-radius:3px;opacity:.8;margin:2px 6px 4px}
+.memo .stamp.red{border-color:var(--bad);color:var(--bad)}
+#arcbar{position:relative;display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--rule);background:var(--panel);color:var(--ink);font:600 14px/1.25 var(--sans);padding:10px 16px;min-height:44px;overflow:hidden}
+#arcbar[hidden]{display:none}
+#arcbar span{position:relative;z-index:1}
+#arcbar i{position:absolute;left:0;bottom:0;height:3px;background:var(--bad);width:0;transition:width .6s}
+#arcbar.ask{background:var(--bad);color:#fff}
+#arcbar.ok{color:var(--good)}
+.sbar{height:10px;border:1px solid var(--rule);border-radius:5px;overflow:hidden;background:var(--panel)}
+.sbar i{display:block;height:100%;background:var(--bad);width:0;transition:width .5s}
+button.done.file{text-align:left;width:100%;font:inherit;color:inherit;cursor:pointer}
 </style>
 </head>
 <body>
@@ -210,7 +229,7 @@ p{margin:0}
   </section>
   <div id="body">
     <aside id="res" aria-label="Stores"></aside>
-    <div id="mid"><nav id="tabs" aria-label="Sections"></nav><main id="main"></main></div>
+    <div id="mid"><button id="arcbar" type="button" hidden><span></span><i></i></button><nav id="tabs" aria-label="Sections"></nav><main id="main"></main></div>
     <footer id="logbar"><button id="observe" type="button" disabled>Observe</button><div id="log" aria-live="polite"></div></footer>
   </div>
 </div>

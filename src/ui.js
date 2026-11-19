@@ -4,13 +4,13 @@ const h = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e
 const btn = (cls, txt, fn) => { const b = h('button', cls, txt); b.type = 'button'; if (fn) b.onclick = fn; return b; };
 let S, C, cur = 'hull', ups = [], fixed = [], sig = '', tabSig = '', buyQ = 1, openK = {}, showDone = false, pulseV = 0, needEnd = false, logSeen = null;
 let opt = {sound:0, calm:0}, main, loadedT = 0, mindCv = null;
-const SAVE_KEY = 'tsd2.save', BUILD = 'Stage one \u00b7 build 19 Nov 2026';
+const SAVE_KEY = 'tsd2.save', BUILD = 'Stage one \u00b7 build 19 Nov 2026 b';
 const U = fn => { ups.push(fn); fn(); };
 const setT = (el, t) => { if (el._t !== t) { el._t = t; el.textContent = t; } };
 const setD = (el, k, v) => { if (el.dataset[k] !== v) el.dataset[k] = v; };
 const fmt3 = x => { if (!isFinite(x)) return '∞'; if (x < 0) return '−' + fmt3(-x); if (x < 1000) return x >= 100 || x % 1 === 0 ? String(Math.floor(x)) : x >= 10 ? x.toFixed(1) : x.toFixed(2); const e = Math.min(8, Math.floor(Math.log10(x)/3)), v = x/Math.pow(1000,e); return (v >= 1000 ? v.toExponential(1) : v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)) + UNITS[e]; };
 const qn = () => buyQ == 'max' ? 500 : buyQ;
-const act = fn => () => { if (S.paused) { toast('Paused. Tap Resume to carry on.'); return; } fn(); S.acts = (S.acts||0) + 1; checks(S); frameUI(); };
+const act = fn => () => { if (S.paused) { toast('Paused. Tap Resume to carry on.'); return; } S.here = S.age; fn(); S.acts = (S.acts||0) + 1; checks(S); frameUI(); };
 const RNAME = {lichen:'lichen', scrap:'scrap', spoons:'spoons', ice:'ice', notions:'notions', cycles:'thought', whimsy:'whimsy', plate:'plate', wire:'wire', spring:'springs', gear:'gears', lens:'lenses', ledger:'ledgers', tea:'tea', grit:'grit', spores:'spores', footnotes:'footnotes'};
 
 function costState(c){ let st = ''; for (const r in c) if ((S.r[r]||0) < c[r] - 1e-9) { if (c[r] > capOf(S,C,r)) return 'cap'; st = 'no'; } return st; }
@@ -258,8 +258,9 @@ R.mind = el => {
 SIG.trade = () => [nb(S,'antenna'), S.pedlar > 0, M.guide.m3].join('|');
 R.trade = el => {
   note(el, () => 'Hails ready: ' + Math.floor(S.hails) + ' of ' + C.capHails + '. One hail recharges every ' + Math.round(90/S.m.hail/(qk(S).hail||1)) + ' seconds.').className = 'lede';
+  if (nb(S,'antenna') >= 1) note(el, () => 'The neighbours remember. Trade with one too often and they give less; buy up their goods and the price climbs until they restock. Both come back with time.');
   for (const id in PART) { const p = PART[id];
-    if (nb(S,'antenna') >= p.ant) el.append(item('t_'+id, {title:() => 'Hail ' + p.n, sub:() => 'Standing ' + S.stand[id] + ' · they give ' + Object.entries(p.give(S,C)).map(([r,x]) => fmt(x) + ' ' + RNAME[r]).join(' and '), act:() => trade(S,id), state:() => S.hails >= 1 && canPay(S,p.cost(S)) ? '' : 'no', cost:() => p.cost(S), desc:p.d}));
+    if (nb(S,'antenna') >= p.ant) el.append(item('t_'+id, {title:() => 'Hail ' + p.n, sub:() => { const m = mk(S,id), f = favM(S,id); return 'Standing ' + S.stand[id] + ' · ' + MOOD(m.ap) + (f > 1 ? ', and it is their season' : f < 1 ? ', and it is their slack season' : '') + ' · ' + RNAME[SPEC[id]] + ': ' + STOCK(m.st) + ' · they give ' + Object.entries(tradeGive(S,id,C)).map(([r,x]) => fmt(x) + ' ' + RNAME[r]).join(' and '); }, act:() => trade(S,id), state:() => S.hails >= 1 && canPay(S,tradeCost(S,id)) ? '' : 'no', cost:() => tradeCost(S,id), desc:p.d + ' Keenest at ' + SEASONS[MKT[id].fav].n + '.'}));
     else el.append(h('p','note','A fainter signal. You will need ' + p.ant + ' antennas to hear it.')); }
   if (S.pedlar > 0) { head(el, 'Odd Tuesday is alongside'); note(el, () => 'Leaving in ' + fmtTime(S.pedlar) + '.');
     if (!M.guide.m3) el.append(item('ped_a', {title:() => 'Buy an antique spoon', act:() => pedlarBuy(S,'antique'), cost:() => ({spoons:1000}), desc:'“Very old. Older than it should be. No refunds, past or future.”'}));
@@ -288,6 +289,7 @@ SIG.rec = () => [Object.keys(M.ach).length, Object.keys(M.endings).length, S.qui
 R.rec = el => {
   note(el, () => 'Life ' + (M.runs + 1) + ' · awake ' + fmtTime(S.age) + ' · ' + fmtLong(S.made) + ' spoons made · ' + fmt(S.hand.stamp) + ' stamped by hand').className = 'lede';
   if (S.quirk) el.append(h('p','note','This life’s quirk: ' + QK[S.quirk].n + '. ' + QK[S.quirk].d));
+  bureauFile(el);
   head(el, 'Endings');
   for (const k in ENDS) { const got = M.endings[k], d = h('div','done' + (got ? '' : ' dim')); d.append(h('b','', got ? ENDS[k].t : 'Not yet reached'), h('span','', got ? ENDS[k].h : ACH['end_'+k][1])); el.append(d); }
   el.append(h('p','note','Stage one ends when you reignite the engine. The other endings are beyond the rock.'));
@@ -295,6 +297,64 @@ R.rec = el => {
   for (const k in ACH) { if (k.startsWith('end_')) continue; const got = M.ach[k], d = h('div','done' + (got ? '' : ' dim')); d.append(h('b','', got ? ACH[k][0] : '? ? ?'), h('span','', got ? ACH[k][1] : '')); el.append(d); }
   if (S.ended) el.append(btn('chip','Begin a new life', beginAgain));
 };
+
+/* ---------- the Bureau's dispatches, and the crisis ---------- */
+const STAMP = {directive:'Action required', quota:'In force', reprimand:'Collected', nominal:'Noted', amend:'Suspended'};
+function memoRef(f){ const sl = seasonLen(S), y = Math.floor(f.a/(4*sl)); return 'Ref. ' + f.id.toUpperCase() + '/' + (y + 1) + ' · filed in year ' + y; }
+function showDispatch(f){
+  const a = S.arc, asking = f.ask && a.ph == 1;
+  sheet((el, close) => {
+    el.classList.add('memo');
+    el.append(h('p','lh','Bureau of Cutlery Equilibrium'), h('p','ref', memoRef(f)), h('h2','', f.t));
+    f.x.split('\n\n').forEach(p => el.append(h('p','mx', p)));
+    el.append(h('div','stamp' + (asking ? ' red' : ''), STAMP[f.id] || 'Filed'));
+    if (asking) {
+      const o = h('div','opts');
+      const b1 = btn('opt'); b1.append(h('b','','Obey the Bureau'), h('span','','Burn half your scrap, plate and wire, and some of the huts. The orbit holds, and a quota of spoons follows.'));
+      const b2 = btn('opt'); b2.append(h('b','','Trust the crew'), h('span','','Keep everything. Each year grows longer and colder until you find a way to correct course yourselves.'));
+      b1.onclick = act(() => { arcChoose(S,'obey'); close(); }); b2.onclick = act(() => { arcChoose(S,'trust'); close(); });
+      o.append(b1, b2); el.append(o, h('p','note','You cannot change your mind afterwards.'), btn('chip wide','Decide later', close));
+    } else el.append(btn('chip wide','File it', close));
+    el.tabIndex = -1; setTimeout(() => el.focus(), 0);   /* no answer starts out selected */
+  }, asking);
+}
+function showCrisis(){
+  const a = S.arc;
+  if (a.ph == 1) return showDispatch(a.files.find(f => f.id == 'directive'));
+  sheet((el, close) => {
+    const trust = a.route == 'trust', done = a.ph == 3;
+    el.append(h('p','pt', done ? 'After' : trust ? 'You trusted the crew' : 'You obeyed the Bureau'), h('h2','', done ? (trust ? 'The Long Summer' : 'The Charter holds') : trust ? 'The Long Dark' : 'The Quota'));
+    if (done) el.append(h('p','note', trust ? 'The rock is back on course. Lichen grows faster for a few years, the frozen crew thaw as it warms, and everyone wants to build: construction costs 40% less for six years.' : 'The quota is lifted for good, and your reserves and huts are back. The presses run faster for a while, the crew are with you, and everyone wants to build: construction costs 40% less for six years.'));
+    else {
+      el.append(h('p','note', trust ? 'Every year is longer and colder than the last. Keep the huts warm with boilers, and keep lichen stored for the dark. Crew who freeze are kept in the cold store, and will thaw when it is warm again. The way out begins in Science, with Measure the drift. Nobody wakes in the dark season.'
+        : 'Each quota is a little higher than the last, and a missed one costs tea and plate. When accord falls much below half, crew start to leave. Tea, brew-ups, bards and gardens keep spirits up. The way out begins in Science, with Collective bargaining.'));
+      const bar = h('div','sbar'), fill = h('i'); bar.append(fill); el.append(h('p','pt', trust ? 'Cold' : 'Unrest'), bar);
+      const line = h('p','note'); el.append(line);
+      const upd = () => { fill.style.width = Math.round(a.strain) + '%'; line.textContent = trust ? 'Drift ' + Math.round(100*a.drift) + '% · ' + a.iced.length + ' in the cold store'
+        : 'Quota ' + (a.q.n + 1) + ': ' + fmt(S.made - a.q.base) + ' of ' + fmt(a.q.target) + ' spoons, ' + fmtTime(Math.max(0, QLEN - a.q.t)) + ' left · ' + a.met + ' met, ' + a.miss + ' missed · ' + a.gone.length + ' have left'; };
+      upd(); const iv = setInterval(() => { if (!el.isConnected) return clearInterval(iv); upd(); }, 500);
+      el.append(h('p','note','Nothing gets worse while you are away.'));
+    }
+    el.append(btn('chip wide','Reread the Bureau’s directive', () => { close(); showDispatch(a.files.find(f => f.id == 'directive')); }), btn('chip wide','Close', close));
+  });
+}
+function arcBar(){
+  const el = $('arcbar'), a = S.arc; if (!a) return;
+  const on = a.ph == 1 || a.ph == 2 || (a.ph == 3 && S.age - a.res < 1800);
+  if (el.hidden === on) el.hidden = !on; if (!on) return;
+  let t, k = '';
+  if (a.ph == 1) { t = 'The Bureau awaits your answer'; k = 'ask'; }
+  else if (a.ph == 3) { t = a.route == 'trust' ? 'The Long Summer has begun' : 'The quota is lifted'; k = 'ok'; }
+  else if (a.route == 'trust') t = 'The Long Dark · cold ' + Math.round(a.strain) + '%' + (a.iced.length ? ' · ' + a.iced.length + ' frozen' : '');
+  else t = 'Quota ' + (a.q.n + 1) + ' · ' + Math.round(100*Math.min(1, (S.made - a.q.base)/a.q.target)) + '% · ' + fmtTime(Math.max(0, QLEN - a.q.t)) + ' left' + (a.gone.length ? ' · ' + a.gone.length + ' gone' : '');
+  if (el._k !== k) { el._k = k; el.className = k; }
+  setT(el.firstChild, t); el.lastChild.style.width = (a.ph == 2 ? Math.round(a.strain) : 0) + '%';
+}
+function bureauFile(el){
+  const a = S.arc; if (!a || !a.files.length) return;
+  head(el, 'The Bureau file');
+  a.files.slice().reverse().forEach(f => { const b = btn('done file'); b.append(h('b','', f.t), h('span','', memoRef(f))); b.onclick = () => showDispatch(f); el.append(b); });
+}
 
 /* ---------- fixed chrome ---------- */
 const ALLRES = ['lichen','scrap','spoons','ice','notions','cycles','whimsy','plate','wire','spring','gear','lens','ledger','tea','grit','spores','footnotes'];
@@ -343,6 +403,7 @@ function buildChrome(){
       setD(w, 's', isFinite(c) && x >= c*0.995 ? 'full' : x <= 0 && d < 0 ? 'bad' : ''); setD(rt, 's', d < 0 ? 'bad' : ''); }); });
   const crew = h('div','r'), ct = h('div','rn'), cv = h('div','rv'); ct.append(h('span','','crew'), h('span','rr')); cv.append(h('span','rx'), h('span','rc')); crew.append(ct, cv); res.append(crew);
   fixed.push(() => { const vis = S.pop > 0 || C.capPop > 0; if (crew.hidden === vis) crew.hidden = !vis; setT(cv.firstChild, String(S.pop)); setT(cv.lastChild, '/' + C.capPop); setT(ct.lastChild, S.tun ? S.tun + ' tun' : S.done.philosophy ? 'acc ' + Math.round(S.accord) + '%' : ''); setD(ct.lastChild, 's', S.tun ? 'bad' : ''); });
+  $('arcbar').onclick = () => { S.here = S.age; showCrisis(); };
   $('ship').onclick = () => { if (S.ended) return; rename(S); checks(S); frameUI(); };
   $('pause').onclick = () => setPause(!S.paused);
   $('menu').onclick = showMenu;
@@ -363,6 +424,7 @@ function drawTop(){
   setT($('ship'), S.ship.n);
   const cl = C.cal, sn = SEASONS[cl.i];
   setT($('date'), S.done.calendar ? 'Year ' + cl.year + ' · ' + sn.n + (sn.w ? ' (' + sn.w + ')' : '') + ', day ' + cl.day : 'Day ' + (Math.floor(S.age/DAY) + 1) + (S.seen.aph || cl.i ? ' · ' + sn.n : ''));
+  arcBar();
   setT($('count'), fmtLong(S.made)); setT($('count-l'), S.made == 1 ? 'spoon made' : 'spoons made');
   const df = $('deficit'); if (df.hidden === !!S.done.smallprint) df.hidden = !S.done.smallprint; if (S.done.smallprint) setT(df, 'Deficit ' + fmtLong(Math.max(0, DEFICIT - S.made)));
   setT($('pause'), S.paused ? 'Resume' : S.flux && S.bank > 0 ? '×4' : 'Pause'); $('app').classList.toggle('paused', !!S.paused);
@@ -379,6 +441,7 @@ function frameUI(){
   if (s2 != sig) { const keep = sig.split('#')[0] == cur ? main.scrollTop : 0; sig = s2; ups = []; mindCv = null; main.replaceChildren(); R[cur](main); main.scrollTop = keep; }
   else for (const f of ups) f();
   drawTop();
+  if (S.arc && S.arc.unread > 0 && !document.querySelector('.back')) { const a = S.arc, f = a.files[a.files.length - a.unread]; a.unread--; if (f) showDispatch(f); }
   if (needEnd) { needEnd = false; showEnd(); }
   if (S.seen.stage2 && !S.seen.stage2shown) { S.seen.stage2shown = 1; showStageEnd(); }
 }
@@ -395,6 +458,7 @@ hook = (k, x) => {
   else if (k == 'unlock') { beep(660, 0.12, 0.04); setTimeout(() => beep(990, 0.18, 0.04), 110); }
   else if (k == 'ach') { toast('Record: ' + x); beep(784, 0.25, 0.04); }
   else if (k == 'end') needEnd = true;
+  else if (k == 'dispatch') { beep(1320, 0.05, 0.04, 'square'); setTimeout(() => beep(1320, 0.05, 0.04, 'square'), 90); setTimeout(() => beep(660, 0.3, 0.04), 200); }
 };
 function sheet(build, lock){
   const back = h('div','back'), box = h('div','sheet'); back.append(box); const close = () => back.remove();

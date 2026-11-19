@@ -11,4 +11,4 @@ t=t.replace("/*GL*/",open(src+'gl.js').read()).replace("/*UI*/",open(src+'ui.js'
 open('index.html','w').write(t)
 print(len(t),'bytes')
 
-open('build/test.html','w').write(t.replace("})();\n</script>","window.__tsd={Sky,get S(){return S},get M(){return M},simulate,frameUI,checks,calc};\n})();\n</script>"))
+open('build/test.html','w').write(t.replace("})();\n</script>","window.__tsd={Sky,get S(){return S},get M(){return M},simulate,frameUI,checks,calc,trade};\n})();\n</script>"))
