@@ -4,7 +4,7 @@ const h = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e
 const btn = (cls, txt, fn) => { const b = h('button', cls, txt); b.type = 'button'; if (fn) b.onclick = fn; return b; };
 let S, C, cur = 'hull', ups = [], fixed = [], sig = '', tabSig = '', buyQ = 1, jobQ = 1, openK = {}, showDone = false, pulseV = 0, needEnd = false, logSeen = null;
 let opt = {sound:0, calm:0}, main, loadedT = 0, mindCv = null;
-const SAVE_KEY = 'tsd2.save', VERSION = '1.4.1', BUILD = 'Stage one \u00b7 version ' + VERSION + ' \u00b7 19 Nov 2026';
+const SAVE_KEY = 'tsd2.save', VERSION = '1.4.2', BUILD = 'Stage one \u00b7 version ' + VERSION + ' \u00b7 19 Nov 2026';
 const U = fn => { ups.push(fn); fn(); };
 const setT = (el, t) => { if (el._t !== t) { el._t = t; el.textContent = t; } };
 const setD = (el, k, v) => { if (el.dataset[k] !== v) el.dataset[k] = v; };
@@ -358,6 +358,14 @@ function bureauFile(el){
   a.files.slice().reverse().forEach(f => { const b = btn('done file'); b.append(h('b','', f.t), h('span','', memoRef(f))); b.onclick = () => showDispatch(f); el.append(b); });
 }
 
+/* the ship's name: a long one pans slowly back and forth instead of being cut off */
+function drawShip(){
+  const b = $('ship'); let sp = b.firstElementChild; if (!sp) { b.textContent = ''; sp = h('span','sn'); b.append(sp); }
+  const key = S.ship.n + '|' + b.clientWidth + '|' + opt.calm; if (b._k === key) return; b._k = key;
+  sp.textContent = S.ship.n; b.title = S.fleet && S.fleet.length ? 'Tap to wear another name from the register' : 'Tap to rename your ship';
+  const over = sp.scrollWidth - b.clientWidth, on = over > 2 && !opt.calm;
+  b.classList.toggle('pan', on); if (on) { b.style.setProperty('--pan', -(over + 8) + 'px'); b.style.setProperty('--dur', (5 + (over + 8)/14).toFixed(1) + 's'); }
+}
 /* ---------- fixed chrome ---------- */
 const ALLRES = ['lichen','scrap','spoons','ice','notions','cycles','whimsy','plate','wire','spring','gear','lens','ledger','tea','grit','spores','footnotes'];
 const TABRES = {hull:['lichen','scrap','spoons','ice','plate'], shop:['scrap','plate','wire','spring','gear','lens','ledger','tea'], crew:['lichen','tea','spoons','whimsy'],
@@ -423,7 +431,7 @@ function drawTabs(){
 }
 function drawTop(){
   const sh = resShown(); for (const f of fixed) f(sh);
-  setT($('ship'), S.ship.n);
+  drawShip();
   const cl = C.cal, sn = SEASONS[cl.i];
   setT($('date'), S.done.calendar ? 'Year ' + cl.year + ' · ' + sn.n + (sn.w ? ' (' + sn.w + ')' : '') + ', day ' + cl.day : 'Day ' + (Math.floor(S.age/DAY) + 1) + (S.seen.aph || cl.i ? ' · ' + sn.n : ''));
   arcBar();

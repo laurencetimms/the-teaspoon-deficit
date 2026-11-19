@@ -53,6 +53,7 @@ node tools/play.js               # scripted opening, Mind, a story, a duty, craf
 
 The version shows in the game's menu. Stage one is 1.x: the middle number goes up for new features, the last for fixes. Set it in `VERSION` at the top of `src/ui.js`.
 
+- 1.4.2: the committee's chosen name goes on the hull, tapping the name cycles the register; long names pan
 - 1.4.1: crew tab gets its own tap control; the census opens straight away
 - 1.4: three acts (the Bureau's directive, the Quota or the Long Dark); neighbours with memories; the Quorate's auditor
 - 1.3: storage rhythm for the Mind; Work songs

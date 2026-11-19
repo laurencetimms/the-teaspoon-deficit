@@ -607,11 +607,12 @@ function observe(S, by){
 function nameSession(S){ if (S.r.cycles < 500) return hook('fail'); S.r.cycles -= 500; S.cand = [0,1,2].sort(() => rand()-0.5).map(t => shipName(t)); hook('buy'); }
 function nameChoose(S, i){
   if (!S.cand) return; const nm = S.cand[i]; if (!nm) return; const hit = nm.t == S.taste, g = (hit ? 20 : 5)*(1 + S.mind.nodes.length/10);
-  S.r.whimsy += g; S.cand = null; S.fleet.unshift(nm.n); S.fleet.length = Math.min(S.fleet.length, 8); S.seen.named = 1;
+  S.r.whimsy += g; S.cand = null; S.fleet = S.fleet.filter(n => n != nm.n); S.fleet.unshift(nm.n); S.fleet.length = Math.min(S.fleet.length, 8); S.seen.named = 1; S.ship = {n:nm.n, t:nm.t};
   if (hit) { S.goodNames++; if (S.goodNames >= 10) ach('patron'); }
-  log(S, '“' + nm.n + '”. ' + (hit ? 'The crew ripple with approval.' : 'The crew are polite about it.') + ' +' + Math.round(g) + ' whimsy.', hit?'good':''); hook('buy');
+  log(S, '“' + nm.n + '”. ' + (hit ? 'The crew ripple with approval.' : 'The crew are polite about it.') + ' +' + Math.round(g) + ' whimsy. The hull is repainted.', hit?'good':''); hook('buy');
 }
-function rename(S){ S.ship = shipName(); S.renames++; if (S.renames >= 7) ach('indecisive'); tickle(S); hook('tap'); }
+/* before the committee sits, a tap draws a random name; after, it cycles through the names the committee has chosen */
+function rename(S){ const F = S.fleet || []; if (F.length > 1 || (F.length == 1 && S.ship.n != F[0])) { const i = F.indexOf(S.ship.n); S.ship = {n:F[(i + 1) % F.length], t:S.ship.t}; } else if (F.length == 1) { hook('fail'); return; } else S.ship = shipName(); S.renames++; if (S.renames >= 7) ach('indecisive'); tickle(S); hook('tap'); }
 function cycleShare(S){ S.share = S.share >= 1 ? 0 : S.share > 0 ? 1 : 0.5; hook('tap'); }
 function setKeep(S, r, d){ S.keep[r] = Math.max(0, (S.keep[r]||0) + d); hook('tap'); }
 
@@ -921,4 +922,4 @@ function actions(S){
 }
 const BASE = ['lichen','scrap','spoons','ice','notions','cycles','whimsy','tea','plate','wire'];
 
-if (typeof module != 'undefined') module.exports = {arc,arcChoose,arcResolve,newArc,present,inCrisis,arcOpen,MKT,mk,tradeCost,tradeGive,favM,CRAFT_IDS:Object.keys(CRAFT),storyStep:typeof storyStep!='undefined'?storyStep:null,setSeed,actions,BASE,PED,team,STORY:CHAINS,setHook:f=>{hook=f;},setTask,TASKS,dreamNeed,scrapCap,newMeta,newState,calc,tick,checks,simulate,buy,bcost,canPay,stamp,pry,scrape,setJob,festival,festCost,observe,trade,pedlarBuy,nameSession,nameChoose,cycleShare,research,prjOpen,prjCost,endRun,craft,craftMax,upgrade,upgOpen,setKeep,setDuty,team,mindDraft,mindTake,rewire,canWire,nodeUp,nodeUpCost,service,valve,storyChoose,storyStep,BLD,PRJ,PRJ_BY,JOBS,DUTY,CRAFT,UPG,MT,PART,GUIDE,ENDS,QK,fmt,fmtLong,fmtTime,cal,thr,nb,lvl,setM:m=>{M=m;},getM:()=>M,log};
+if (typeof module != 'undefined') module.exports = {rename,arc,arcChoose,arcResolve,newArc,present,inCrisis,arcOpen,MKT,mk,tradeCost,tradeGive,favM,CRAFT_IDS:Object.keys(CRAFT),storyStep:typeof storyStep!='undefined'?storyStep:null,setSeed,actions,BASE,PED,team,STORY:CHAINS,setHook:f=>{hook=f;},setTask,TASKS,dreamNeed,scrapCap,newMeta,newState,calc,tick,checks,simulate,buy,bcost,canPay,stamp,pry,scrape,setJob,festival,festCost,observe,trade,pedlarBuy,nameSession,nameChoose,cycleShare,research,prjOpen,prjCost,endRun,craft,craftMax,upgrade,upgOpen,setKeep,setDuty,team,mindDraft,mindTake,rewire,canWire,nodeUp,nodeUpCost,service,valve,storyChoose,storyStep,BLD,PRJ,PRJ_BY,JOBS,DUTY,CRAFT,UPG,MT,PART,GUIDE,ENDS,QK,fmt,fmtLong,fmtTime,cal,thr,nb,lvl,setM:m=>{M=m;},getM:()=>M,log};
