@@ -241,7 +241,12 @@ function mindCalc(S, c){
   return {cps: cps*(1-div), out, heat: net, hcap, pen, cap: cap*(S.done.attic2 ? 1.5 : 1), notions: cps*div/6, gland, bilge, raw: cps};
 }
 function mindScore(S){ const c = calc(S); return c.mind.cps + c.mind.notions*4 + c.mind.cap/500; }
-function draftOffer(S){ const p = MPOOL(S).slice().sort(() => rand()-0.5), seen = {}, o = []; for (const k of p) { if (!seen[k]) { seen[k] = 1; o.push(k); } if (o.length == 3) break; } return o; }
+const storeRoom = S => { const N = S.mind.nodes, pr = N.filter(n => MT[n.k].g == 'prod').length, st = N.filter(n => MT[n.k].g == 'store').length; return pr > 2*st; };
+function draftOffer(S){ const room = storeRoom(S), all = MPOOL(S).slice().sort(() => rand()-0.5), seen = {}, o = [];
+  const st = all.filter(k => MT[k].g == 'store'), p = all.filter(k => MT[k].g != 'store');
+  if (room && st.length) { o.push(st[0]); seen[st[0]] = 1; }
+  for (const k of p) { if (!seen[k]) { seen[k] = 1; o.push(k); } if (o.length == 3) break; }
+  return o.sort(() => rand()-0.5); }
 const dreamNeed = S => 15000*Math.pow(1.7, S.mind.dreams);
 function mindDraft(S){ if (S.mp < 1 || S.mind.offer) return hook('fail'); S.mp--; S.mind.offer = draftOffer(S); S.mind.dreamt = 0; hook('buy'); }
 const TASKS = {idle:['Leak whimsy','The old way. A full Mind leaks whimsy, and nothing else happens.'], ponder:['Ponder','Spare thought becomes notions for the scholars, eight thoughts to a notion.'],
@@ -455,7 +460,7 @@ function tick(S, dt, online){
   if (c.kettle > 0 && r.lichen > c.caps.lichen*0.3) { const k = Math.min(c.kettle*dt, r.lichen/0.5, r.ice/0.2); if (k > 0) { r.lichen -= k*0.5; r.ice -= k*0.2; r.tea += k*0.01; } }
   r.tea = Math.max(0, r.tea - c.teaUse*dt);
   r.notions = Math.min(c.caps.notions, r.notions + c.notionsIn*dt);
-  r.whimsy += c.N.bard*0.003*(q.whim||1)*dt;
+  r.whimsy += c.N.bard*0.003*(S.done.ballads ? 3 : 1)*(q.whim||1)*dt;
   mindTick(S, dt, c, online);
   dutiesTick(S, dt, c, online);
   /* crew learn their trades */
@@ -635,6 +640,7 @@ const PRJ = [
  {id:'condense',tab:'sci',n:'Condensation',d:'Frost forms on the cold side. Unlocks Icers, the Condenser and the Ice cellar.',c:{notions:1500,plate:3},req:S=>S.done.craft},
  {id:'signal',tab:'sci',n:'Signal theory',d:'Something out there is humming. Unlocks the Antenna, once you can draw wire.',c:{notions:2800,plate:5},req:S=>S.done.metallurgy},
  {id:'prybars',tab:'sci',n:'Pry-bars',d:'A spoon with ambitions. Scavengers +50%.',c:{notions:2000,plate:5},req:S=>S.done.metallurgy,fx:mulf('scav',1.5)},
+ {id:'ballads',tab:'sci',n:'Work songs',d:'The bards learn the rhythm of the presses and sing it back, slightly wrong. Bards make three times the whimsy.',c:{notions:600},req:S=>S.done.philosophy},
  {id:'survey',tab:'sci',n:'Deep hull survey',d:'There are whole decks down there. Unlocks the Tun-rack.',c:{notions:2200},req:S=>S.done.metallurgy},
  {id:'smelting',tab:'sci',n:'Smelting',d:'Plate without the hammering. Unlocks the Smelter.',c:{notions:3200,plate:10},req:S=>S.done.metallurgy},
  {id:'brewing',tab:'sci',n:'Brewing',d:'Lichen and ice and patience. Unlocks tea and the Kettle-house, and the Brew-up.',c:{notions:3800,ice:50},req:S=>S.done.condense&&S.done.philosophy},

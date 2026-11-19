@@ -4,7 +4,7 @@ const h = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e
 const btn = (cls, txt, fn) => { const b = h('button', cls, txt); b.type = 'button'; if (fn) b.onclick = fn; return b; };
 let S, C, cur = 'hull', ups = [], fixed = [], sig = '', tabSig = '', buyQ = 1, openK = {}, showDone = false, pulseV = 0, needEnd = false, logSeen = null;
 let opt = {sound:0, calm:0}, main, loadedT = 0, mindCv = null;
-const SAVE_KEY = 'tsd2.save', BUILD = 'Stage one \u00b7 build 18 Nov 2026';
+const SAVE_KEY = 'tsd2.save', BUILD = 'Stage one \u00b7 build 19 Nov 2026';
 const U = fn => { ups.push(fn); fn(); };
 const setT = (el, t) => { if (el._t !== t) { el._t = t; el.textContent = t; } };
 const setD = (el, k, v) => { if (el.dataset[k] !== v) el.dataset[k] = v; };
@@ -220,7 +220,7 @@ R.mind = el => {
   if (S.mind.offer) { const box = h('div','offer'); box.append(h('p','pt', S.mind.dreamt ? 'The Mind dreamt these: choose one' : 'Requisition: choose one subsystem'));
     S.mind.offer.forEach(k => { const T = MT[k], b = btn('opt'); b.append(h('b','',T.n), h('span','', MG[T.g] + '. ' + T.d)); b.onclick = act(() => mindTake(S, k)); box.append(b); });
     box.append(h('p','note','It will be wired where it seems most useful. You can move it afterwards.')); el.append(box); }
-  else el.append(item('draft', {title:() => 'Requisition a subsystem', act:() => mindDraft(S), state:() => S.mp >= 1 ? '' : 'no', desc:'Spend 1 Mandate. The Bureau sends three candidates, all second-hand. Pick one to fit.', more:d => note(d, () => S.mp >= 1 ? S.mp + ' Mandate to spend.' : 'You need Mandate, which comes from making spoons.')}));
+  else el.append(item('draft', {title:() => 'Requisition a subsystem', act:() => mindDraft(S), state:() => S.mp >= 1 ? '' : 'no', desc:'Spend 1 Mandate. The Bureau sends three candidates, all second-hand. Pick one to fit. The Bureau only sends storage when the Mind has more than twice as many thinking parts as storage parts, and then it always sends one.', more:d => note(d, () => S.mp >= 1 ? S.mp + ' Mandate to spend.' : 'You need Mandate, which comes from making spoons.')}));
   /* the diagram */
   const wrap = h('div','mindwrap'), leg = h('div','legend'); for (const g in MG) { const c = h('span','lg'); c.style.setProperty('--c', 'var(' + GCOL[g] + ')'); c.textContent = MG[g]; leg.append(c); } mindCv = h('canvas','mindcv'); mindCv.setAttribute('role','img'); mindCv.setAttribute('aria-label','Diagram of the Mind’s subsystems and how they are wired'); mindCv.onclick = mindTap; wrap.append(mindCv); el.append(wrap, leg);
   const stats = h('div','mstats'); U(() => { const mc = C.mind; setT(stats, 'Thinking ' + fmt(mc.cps) + '/s · holds ' + fmt(mc.cap) + ' · heat ' + mc.heat.toFixed(1) + ' of ' + mc.hcap.toFixed(0) + (mc.pen < 1 ? ' · overheating: thought −' + Math.round(100*(1-mc.pen)) + '%' : '') + (mc.notions > 0 ? ' · +' + fmt(mc.notions) + ' notions/s' : '')); }); el.append(stats);
@@ -317,7 +317,7 @@ function flows(r){ const c = C, m = S.m, f = [], aph = c.cal.i == 2;
   if (r == 'plate') { if (c.smelt && S.r.scrap > c.caps.scrap*0.5) add('Smelters', c.smelt/50); if (c.mill) add('Drawing mills', -c.mill*0.03); }
   if (r == 'wire' && c.mill) add('Drawing mills', c.mill*0.015);
   return f; }
-const ORIGIN = {whimsy:'Leaks from a full Mind and from bards. Spent on odd projects, latitude and the pedlar.', plate:'Hammered from scrap in the Workshop, or sweated out by smelters.', wire:'Drawn from plate in the Workshop or by drawing mills.', spring:'Coiled from wire in the Workshop.', gear:'Cut in the Workshop from plate and springs.', lens:'Ground from ice and grit in the Workshop.', ledger:'Pressed from plate and notions in the Workshop. The Quorate want them.', tea:'Brewed by kettle-houses or by hand in the Workshop. The crew drink it constantly.', grit:'Only the Gravel Choir have it. Hail them from the Trade tab.', spores:'Only the Slow Bloom have them.', footnotes:'Only the Quorate sell them, for ledgers.', spoons:'Stamped from scrap by hand, by presses and by the rota.', cycles:'Thought. The Mind makes it; projects and the naming committee spend it.'};
+const ORIGIN = {whimsy:'Leaks from a full Mind and from bards (three times as much once they know Work songs). Spent on odd projects, latitude and the pedlar.', plate:'Hammered from scrap in the Workshop, or sweated out by smelters.', wire:'Drawn from plate in the Workshop or by drawing mills.', spring:'Coiled from wire in the Workshop.', gear:'Cut in the Workshop from plate and springs.', lens:'Ground from ice and grit in the Workshop.', ledger:'Pressed from plate and notions in the Workshop. The Quorate want them.', tea:'Brewed by kettle-houses or by hand in the Workshop. The crew drink it constantly.', grit:'Only the Gravel Choir have it. Hail them from the Trade tab.', spores:'Only the Slow Bloom have them.', footnotes:'Only the Quorate sell them, for ledgers.', spoons:'Stamped from scrap by hand, by presses and by the rota.', cycles:'Thought. The Mind makes it; projects and the naming committee spend it.'};
 function showStore(r){
   sheet((el, close) => {
     const cap = capOf(S,C,r), f = flows(r), net = f.reduce((a,x) => a + x[1], 0);
