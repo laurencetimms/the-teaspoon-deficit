@@ -1,42 +1,38 @@
-// A scripted first ten minutes with real taps, then pause, away-time, petition, trade, pedlar and a new life.
-const { chromium } = require('playwright');
-const OUT = require('path').join(__dirname, '..', 'build');
+// Scripted tap-through: the opening by hand, then the new systems, then away time and a reload.
+const { chromium } = require('playwright'); const path = require('path');
+const OUT = path.join(__dirname, '..', 'build');
 (async () => {
   const browser = await chromium.launch({executablePath: process.env.CHROME || undefined, args:['--no-sandbox','--use-gl=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
-  const ctx = await browser.newContext({viewport:{width:390,height:760}, deviceScaleFactor:2, hasTouch:true});
+  const ctx = await browser.newContext({viewport:{width:390,height:844}, deviceScaleFactor:2, hasTouch:true});
   const page = await ctx.newPage(); const errs = [];
   page.on('console', m => { if (m.type() == 'error') errs.push(m.text()); });
-  page.on('pageerror', e => errs.push('PAGEERROR ' + e.message + (e.stack||'').split('\n').slice(0,3).join(' | ')));
-  await page.goto('file://' + require('path').join(__dirname, '..', 'build', 'test.html')); await page.waitForTimeout(400);
-  const tap = async (sel, n=1) => { for (let i = 0; i < n; i++) await page.click(sel, {timeout:3000}); };
-  const st = () => page.evaluate(() => { const S = __tsd.S; return {made:S.made, pop:S.pop, b:S.b, r:S.r, jobs:S.jobs, bank:S.bank, age:S.age}; });
+  page.on('pageerror', e => errs.push('PAGEERROR ' + e.message));
+  await page.goto('file://' + path.join(OUT, 'test.html')); await page.waitForTimeout(400);
+  const tap = async (sel, n = 1) => { for (let i = 0; i < n; i++) await page.click(sel, {timeout: 3000}); };
+  const st = () => page.evaluate(() => { const S = __tsd.S; return {made: Math.round(S.made), pop: S.crew.length, b: S.b, scav: S.crew.filter(t => t.j == 'scav').length, mand: S.mand, nodes: S.mind.nodes.length}; });
   const skip = s => page.evaluate(s => { __tsd.simulate(__tsd.S, s); __tsd.frameUI(); }, s);
-  await tap('.hand.prime', 10); await tap('text=Pry scrap', 6); await tap('.hand.prime', 4);
+  await tap('.hand.prime', 10); await tap('text=Pry scrap', 8); await tap('.hand.prime', 6);
   await tap('text=Scrape lichen', 14); await tap('.act:has-text("Lichen bed")'); await tap('text=Pry scrap', 10); await tap('.act:has-text("Moss hut")');
-  await tap('text=Scrape lichen', 10); await skip(30); console.log('after hut', JSON.stringify(await st()));
-  await page.screenshot({path:OUT + '/play_1.png'});
-  await tap('#tab-crew'); await tap('.job .pm >> nth=1'); console.log('jobs', JSON.stringify((await st()).jobs));
-  await tap('#tab-hull'); await tap('text=Pry scrap', 25); await tap('.hand.prime', 12); await tap('.act:has-text("Stamping press")');
-  await tap('text=Pry scrap', 20); await tap('.hand.prime', 20); await page.waitForTimeout(1200); await tap('#tab-mind'); await page.screenshot({path:OUT + '/play_2.png'}); await tap('.act:has-text("Processor")');
-  // pause banks time, and actions are refused
-  await tap('#pause'); await page.waitForTimeout(700); await tap('#tab-hull'); await tap('.hand.prime'); const a = await st(); await page.waitForTimeout(400); const b = await st();
-  console.log('paused: age moved', b.age - a.age, 'bank', b.bank.toFixed(2)); await tap('#pause');
-  // come back after three hours away
-  await page.evaluate(() => { __tsd.S.t = Date.now() - 3*3600e3; localStorage.setItem('tsd1.save', JSON.stringify({S:__tsd.S, M:__tsd.M})); });
-  await page.evaluate(() => { window.onpagehide = null; }); 
-  const saved = await page.evaluate(() => localStorage.getItem('tsd1.save'));
-  await page.addInitScript(v => { if (!sessionStorage.getItem('once')) { sessionStorage.setItem('once','1'); localStorage.setItem('tsd1.save', v); } }, saved);
-  await page.reload(); await page.waitForTimeout(600); console.log('after 3h away', JSON.stringify(await st())); await page.screenshot({path:OUT + '/play_3.png'});
-  // force a petition, the pedlar, and an antenna
-  await page.evaluate(() => { const S = __tsd.S; S.done.philosophy = 1; S.pet = 4; S.petLeft = 200; S.b.antenna = 3; S.pedlar = 100; S.r.spoons = 1e5; S.r.whimsy = 100; __tsd.frameUI(); });
-  await tap('#tab-crew'); await page.screenshot({path:OUT + '/play_4.png'}); await tap('text=Attend');
-  await tap('#tab-trade'); await tap('text=Hail The Gravel Choir'); await tap('text=Buy an antique spoon'); await tap('text=Buy a loose page'); await page.screenshot({path:OUT + '/play_5.png'});
-  // an early ending and a new life with a quirk
-  await page.evaluate(() => { const S = __tsd.S; S.done.orbital = 1; S.accord = 95; S.accMod = 30; S.pop = 45; S.jobs.bard = 12; S.jobs.grazer = 33; S.seen.mind = 1; S.r.whimsy = 500; __tsd.frameUI(); });
-  await tap('#tab-mind'); await tap('text=Decline the call'); await page.waitForTimeout(200); await page.screenshot({path:OUT + '/play_6.png'});
-  await tap('text=Begin a new life'); await page.waitForTimeout(200); await page.screenshot({path:OUT + '/play_7.png'}); await tap('.sheet .chip >> nth=0'); await page.waitForTimeout(300);
-  console.log('new life', JSON.stringify(await st()), await page.evaluate(() => JSON.stringify({q:__tsd.S.quirk, runs:__tsd.M.runs, ends:__tsd.M.endings, heir:__tsd.S.heir})));
-  await page.screenshot({path:OUT + '/play_8.png'});
-  console.log(errs.length ? errs.join('\n') : 'no console errors');
-  await browser.close();
+  await tap('text=Scrape lichen', 10); await skip(40);
+  await tap('#tab-crew'); await tap('.job .pm >> nth=1'); console.log('opening:', JSON.stringify(await st()));
+  await tap('#tab-hull'); await tap('text=Pry scrap', 20); await tap('.hand.prime', 20); await tap('.act:has-text("Stamping press")');
+  await page.evaluate(() => { __tsd.S.r.scrap = 100; }); await tap('.hand.prime', 40); await page.waitForTimeout(1300); await tap('#tab-mind'); await tap('text=Requisition a subsystem'); await tap('.offer .opt >> nth=0');
+  console.log('mind:', JSON.stringify(await st()));
+  await page.mouse.click(195, 700); // tap the diagram
+  await page.mouse.click(150, 60); await page.waitForTimeout(500); await page.mouse.click(150, 60); // expand and close the view
+  await tap('.r-cycles'); await tap('.sheet .chip.wide');
+  // give it a working colony, then try the story, the workshop and duties
+  await page.evaluate(() => { const S = __tsd.S; S.r.notions = 500; S.r.scrap = 400; S.b.nook = 2; S.b.locker = 3; S.done.calendar = S.done.craft = S.done.delegation = S.done.philosophy = 1; for (let i = 0; i < 10; i++) S.crew.push({n:'Test ' + i, t:'clumsy', j:'grazer', x:{}, d:''}); S.b.hut = 6; S.hand.stamp = 200; S.st.cur = {ch:'who', s:0, w:0, age:0}; __tsd.checks(S); __tsd.frameUI(); });
+  await tap('#tab-crew'); await tap('.opts .opt >> nth=0');
+  await tap('.duty .pm >> nth=1'); await tap('.duty .pm >> nth=1'); await skip(1800);
+  await page.screenshot({path: path.join(OUT, 'play_duties.png')});
+  await page.evaluate(() => { __tsd.S.b.bench = 1; __tsd.S.r.scrap = 900; __tsd.frameUI(); }); await tap('#tab-shop'); await tap('.craft .chip >> nth=2');
+  console.log('after story, duty and craft:', await page.evaluate(() => JSON.stringify({plate: __tsd.S.r.plate, rota: __tsd.S.duty.stamp, flagwho: __tsd.S.st.flags.who})));
+  // away for three hours, then reload from storage
+  await page.evaluate(() => { __tsd.S.t = Date.now() - 3*3600e3; localStorage.setItem('tsd2.save', JSON.stringify({S:__tsd.S, M:__tsd.M})); window.onbeforeunload = null; });
+  const saved = await page.evaluate(() => localStorage.getItem('tsd2.save'));
+  await page.addInitScript(v => { if (!sessionStorage.getItem('once')) { sessionStorage.setItem('once','1'); localStorage.setItem('tsd2.save', v); } }, saved);
+  await page.reload(); await page.waitForTimeout(700); console.log('after 3h away:', JSON.stringify(await st()));
+  await page.screenshot({path: path.join(OUT, 'play_back.png')});
+  console.log(errs.length ? errs.join('\n') : 'no console errors'); await browser.close();
 })();
