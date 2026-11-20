@@ -4,7 +4,7 @@ const h = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e
 const btn = (cls, txt, fn) => { const b = h('button', cls, txt); b.type = 'button'; if (fn) b.onclick = fn; return b; };
 let S, C, cur = 'hull', ups = [], fixed = [], sig = '', tabSig = '', buyQ = 1, jobQ = 1, openK = {}, showDone = false, pulseV = 0, needEnd = false, logSeen = null;
 let opt = {sound:0, calm:0}, main, loadedT = 0, mindCv = null;
-const SAVE_KEY = 'tsd2.save', VERSION = '1.4.2', BUILD = 'Stage one \u00b7 version ' + VERSION + ' \u00b7 19 Nov 2026';
+const SAVE_KEY = 'tsd2.save', VERSION = '1.5', BUILD = 'Stage one \u00b7 version ' + VERSION + ' \u00b7 19 Nov 2026';
 const U = fn => { ups.push(fn); fn(); };
 const setT = (el, t) => { if (el._t !== t) { el._t = t; el.textContent = t; } };
 const setD = (el, k, v) => { if (el.dataset[k] !== v) el.dataset[k] = v; };
@@ -43,7 +43,7 @@ const jobMode = el => seg(el, 'Each tap moves', [[1,'1'],[5,'5'],[10,'10'],['max
 const anyStory = () => !!S.st.cur;
 const TABS = [
  {id:'hull',n:'Hull',show:()=>1,badge:()=>0},
- {id:'shop',n:'Workshop',show:()=>nb(S,'bench')>=1,badge:()=>upgOpen(S).some(u=>canPay(S,u.c))},
+ {id:'shop',n:'Workshop',show:()=>nb(S,'bench')>=1,badge:()=>!S.trial&&upgOpen(S).some(u=>canPay(S,upCost(S,u.id)))},
  {id:'crew',n:'Crew',show:()=>S.seen.crew,badge:anyStory},
  {id:'sci',n:'Science',show:()=>nb(S,'nook')>=1,badge:()=>prjOpen(S,'sci').some(p=>canPay(S,prjCost(S,p)))},
  {id:'mind',n:'Mind',show:()=>S.seen.mind,badge:()=>S.mp>0||!!S.mind.offer||prjOpen(S,'mind').some(p=>canPay(S,p.c))},
@@ -111,7 +111,13 @@ R.shop = el => {
     el.append(w); }
   head(el, 'Upgrades');
   const o = upgOpen(S); if (!o.length) el.append(h('p','note','Nothing to fit yet. Upgrades appear as you build and discover.'));
-  o.forEach(u => el.append(item('u_'+u.id, {title:() => u.n, sub:() => u.d, act:() => upgrade(S,u.id), cost:() => u.c, desc:u.d})));
+  else { note(el, () => 'Each upgrade is trialled before it is fitted, one at a time. A trial can fail; another go costs less and is likelier to work. ' + (team(S,'craft').length ? 'Your Workshop crew are trialling at ' + Math.round(100*trialSpeed(S)) + '% speed.' : 'A Workshop crew would trial faster, and fail less.'));
+    meter(el, () => S.trial ? S.trial.t/S.trial.need : 0, 'trial'); }
+  const tsub = u => { const tr = S.trial, f = tfails(S,u.id), p = Math.round(100*trialOdds(S,u.id));
+    if (tr && tr.id == u.id) return 'In trial · ' + fmtTime(Math.max(0, (tr.need - tr.t)/trialSpeed(S))) + ' left · ' + p + '% likely to work';
+    if (f) return 'Failed ' + (f == 1 ? 'once' : f + ' times') + ' · another go is ' + p + '% likely to work';
+    return tr ? u.d.replace(/\.$/, '') + ' · waiting for the current trial' : u.d; };
+  o.forEach(u => el.append(item('u_'+u.id, {title:() => u.n, sub:() => tsub(u), act:() => upgrade(S,u.id), cost:() => upCost(S,u.id), state:() => S.trial ? (S.trial.id == u.id ? 'on' : 'no') : canPay(S, upCost(S,u.id)) ? '' : 'no', desc:u.d + ' Trial takes about ' + fmtTime(u.sec) + ' with nobody helping, less with a Workshop crew.'})));
   el.append(btn('link', showDone ? 'Hide fitted upgrades' : 'Show fitted upgrades', () => { showDone = !showDone; frameUI(); }));
   if (showDone) UPG.filter(u => S.up[u.id]).forEach(u => { const d = h('div','done'); d.append(h('b','',u.n), h('span','',u.d)); el.append(d); });
 };

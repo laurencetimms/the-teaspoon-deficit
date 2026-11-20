@@ -146,7 +146,7 @@ const UPG = [
  {id:'wrakes',n:'Wire rakes',d:'Grazers +25%.',c:{wire:8},req:S=>S.done.wiredraw,fx:mulf('graze',1.25)},
  {id:'shelving',n:'Nook shelving',d:'Reading nooks hold 50% more.',c:{plate:10,wire:4},req:S=>S.done.wiredraw&&nb(S,'nook')>=3,fx:S=>{S.m.nook=(S.m.nook||1)*1.5;}},
  {id:'whistle',n:'Whistling kettles',d:'Kettle-houses ×2. The whistling is considered a feature.',c:{plate:12,wire:4},req:S=>nb(S,'kettle')>=1&&S.done.wiredraw,fx:S=>{S.m.kettle*=2;S.accPerm+=1;}},
- {id:'jacket',n:'Boiler jackets',d:'Boilers +50% warmth and burn 25% less.',c:{plate:25},req:S=>nb(S,'boiler')>=1,fx:S=>{S.m.warm*=1.5;S.m.fuel*=0.75;}},
+ {id:'jacket',n:'Boiler jackets',d:'Boilers +50% warmth and burn 25% less.',c:{plate:25},req:S=>nb(S,'boiler')>=4&&S.done.wiredraw,fx:S=>{S.m.warm*=1.5;S.m.fuel*=0.75;}},
  {id:'crucible',n:'Crucibles',d:'Smelters ×2.',c:{plate:30,ice:200},req:S=>nb(S,'smelter')>=3,fx:mulf('smelt',2)},
  {id:'lamps',n:'Reading lamps',d:'Scholars +25%.',c:{wire:5,lens:1},req:S=>S.done.lensgrind,fx:mulf('notion',1.25)},
  {id:'bell',n:'School bell',d:'Duties learn 25% faster.',c:{plate:10,wire:6},req:S=>nb(S,'school')>=1,fx:mulf('learn',1.25)},
@@ -169,7 +169,36 @@ const UPG = [
  {id:'tess',n:'Tessellated storage',d:'Lockers hold 50% more.',c:{plate:60,spring:5},req:S=>S.done.tess,fx:mulf('cap',1.5)}];
 const UPG_BY = {}; UPG.forEach(u => UPG_BY[u.id] = u);
 const upgOpen = S => UPG.filter(u => !S.up[u.id] && u.req(S));
-function upgrade(S, id){ const u = UPG_BY[id]; if (S.up[id] || !u.req(S) || !canPay(S,u.c)) return hook('fail'); pay(S,u.c); S.up[id] = 1; u.fx(S); log(S,'Fitted: ' + u.n + '.','good'); hook('unlock'); }
+/* Upgrades are not bought, they are trialled. You pay for a prototype; the crew trial it for a while; it may fail,
+   and each failure makes the next attempt likelier to work. One trial at a time, so upgrades arrive spaced out.
+   Prices are scaled to the era each upgrade arrives in. A Workshop crew trials faster and better. */
+const TIER = {
+ rakes:1, hafts:1, slats:1, hoes:1, oil:1, picks:1, vice:2, dies:2, frost:2, bellows:2,
+ grapnel:3, coils:3, wrakes:3, shelving:3, whistle:3, lamps:3, bell:3, crucible:3, vats:3, dish:3,
+ jacket:4, bunks:4, spectacles:4, slates:4, brass:4, tube:4, thingauge:4, ferment:4, jig:4, sprung:4, sledge:4,
+ geared:5, lathe:5, stemgear:5, rivbunk:5, tess:5};
+const TIERX = {1:[1.5,0,30], 2:[2,300,50], 3:[3,1500,80], 4:[2,4000,120], 5:[2,8000,150]};   /* cost ×, notions added, trial seconds */
+UPG.forEach(u => { const [x, nt, sec] = TIERX[TIER[u.id] || 3]; const c = {}; for (const r in u.c) c[r] = Math.ceil(u.c[r]*(r == 'plate' ? Math.min(x, 1.5) : x));   /* plate is always scarce; scale it gently */ if (nt) c.notions = (c.notions||0) + nt; u.c = c; u.sec = sec; });
+const tfails = (S, id) => (S.tfail && S.tfail[id]) || 0;
+function upCost(S, id){ const u = UPG_BY[id], f = tfails(S,id); if (!f) return u.c; const o = {}; for (const r in u.c) o[r] = Math.ceil(u.c[r]*0.3); return o; }   /* a retry only needs the parts that broke */
+function trialSpeed(S){ const T = team(S,'craft'), d = S.duty.craft; return 1 + (T.length ? Math.min(1.4, 0.25*T.length)*(0.6 + (d ? d.c : 0)/100) : 0); }
+function trialOdds(S, id){ const d = S.duty.craft, T = team(S,'craft'); return Math.min(0.95, 0.65 + 0.15*tfails(S,id) + (T.length && d ? d.c/400 : 0)); }
+function upgrade(S, id){ const u = UPG_BY[id], c = upCost(S,id);
+  if (S.up[id] || S.trial || !u.req(S) || !canPay(S,c)) return hook('fail');
+  pay(S,c); S.trial = {id, t:0, need:u.sec}; touch(S);
+  log(S, (tfails(S,id) ? 'The crew patch up the ' : 'The crew build a prototype of the ') + u.n.toLowerCase() + ' and start trialling it.', ''); hook('buy'); }
+const TFAIL = ['The {n} prototype went through the ceiling. The crew now know where the ceiling is.', 'The {n} trial ended in a small fire and a large meeting.',
+ 'The {n} worked perfectly until somebody used it.', '{who} tested the {n} by licking it. The results are inconclusive.', 'The {n} prototype has been declared a learning experience.',
+ 'The {n} did something, but not the thing. The crew have written down what it did, in case.'];
+function trialTick(S, dt){
+  const tr = S.trial; if (!tr) return; const u = UPG_BY[tr.id]; if (!u) { S.trial = null; return; }
+  tr.t += dt*trialSpeed(S); if (tr.t < tr.need) return;
+  S.trial = null; const d = S.duty.craft;
+  if (rand() < trialOdds(S, tr.id)) { S.up[tr.id] = 1; u.fx(S); if (d) d.c = Math.min(100, d.c + 2);
+    log(S, 'Trial complete: the ' + u.n.toLowerCase() + ' works' + (tfails(S,tr.id) ? ', at last' : '') + '. Fitted across the ship.', 'good'); hook('unlock'); }
+  else { if (!S.tfail) S.tfail = {}; S.tfail[tr.id] = tfails(S,tr.id) + 1; if (d) d.c = Math.min(100, d.c + 1);
+    log(S, pick(TFAIL).replace('{n}', u.n.toLowerCase()).replace('{who}', S.crew.length ? pick(S.crew).n : 'Somebody') + ' Another go will cost less, and is likelier to work.', 'bad'); hook('fail'); }
+}
 
 /* ---------- the Mind: a growing tangle of subsystems ---------- */
 const MG = {core:'Core', prod:'Thinks', store:'Stores', amp:'Amplifies', cool:'Cools', conv:'Converts', odd:'Odd'};
@@ -465,6 +494,7 @@ function tick(S, dt, online){
   r.whimsy += c.N.bard*0.003*(S.done.ballads ? 3 : 1)*(q.whim||1)*dt;
   mindTick(S, dt, c, online);
   dutiesTick(S, dt, c, online);
+  trialTick(S, dt);
   arcTick(S, dt, c, online);
   /* crew learn their trades */
   const sk = (q.skill||1)*dt;
@@ -896,7 +926,7 @@ function actions(S){
   A('stamp','hand',{scrap:1},() => stamp(S)); A('pry','hand',null,() => pry(S)); A('scrape','hand',null,() => scrape(S));
   for (const k in BLD) if (BLD[k].req(S)) A('b:'+k,'build',buy1cost(S,k),() => buy(S,k,1));
   for (const k in CRAFT) if (CRAFT[k].req(S)) A('c:'+k,'craft',CRAFT[k].c,() => craft(S,k,1));
-  for (const u of upgOpen(S)) A('u:'+u.id,'upgrade',u.c,() => upgrade(S,u.id));
+  for (const u of upgOpen(S)) A('u:'+u.id,'upgrade',upCost(S,u.id),() => upgrade(S,u.id), !S.trial && canPay(S, upCost(S,u.id)));
   for (const tab of ['sci','mind']) for (const p of prjOpen(S,tab)) A('p:'+p.id, p.id == 'stay' ? 'ending' : tab == 'sci' ? 'research' : 'project', prjCost(S,p), () => research(S,p.id));
   const graz = S.crew.filter(t => !t.d && t.j == 'grazer').length;
   for (const j in JOBS) if (j != 'grazer' && JOBS[j].req(S)) { A('j+:'+j,'job',null,() => setJob(S,j,1), graz > 0); A('j-:'+j,'job',null,() => setJob(S,j,-1), S.crew.some(t => !t.d && t.j == j)); }
@@ -922,4 +952,4 @@ function actions(S){
 }
 const BASE = ['lichen','scrap','spoons','ice','notions','cycles','whimsy','tea','plate','wire'];
 
-if (typeof module != 'undefined') module.exports = {rename,arc,arcChoose,arcResolve,newArc,present,inCrisis,arcOpen,MKT,mk,tradeCost,tradeGive,favM,CRAFT_IDS:Object.keys(CRAFT),storyStep:typeof storyStep!='undefined'?storyStep:null,setSeed,actions,BASE,PED,team,STORY:CHAINS,setHook:f=>{hook=f;},setTask,TASKS,dreamNeed,scrapCap,newMeta,newState,calc,tick,checks,simulate,buy,bcost,canPay,stamp,pry,scrape,setJob,festival,festCost,observe,trade,pedlarBuy,nameSession,nameChoose,cycleShare,research,prjOpen,prjCost,endRun,craft,craftMax,upgrade,upgOpen,setKeep,setDuty,team,mindDraft,mindTake,rewire,canWire,nodeUp,nodeUpCost,service,valve,storyChoose,storyStep,BLD,PRJ,PRJ_BY,JOBS,DUTY,CRAFT,UPG,MT,PART,GUIDE,ENDS,QK,fmt,fmtLong,fmtTime,cal,thr,nb,lvl,setM:m=>{M=m;},getM:()=>M,log};
+if (typeof module != 'undefined') module.exports = {upCost,trialSpeed,trialOdds,rename,arc,arcChoose,arcResolve,newArc,present,inCrisis,arcOpen,MKT,mk,tradeCost,tradeGive,favM,CRAFT_IDS:Object.keys(CRAFT),storyStep:typeof storyStep!='undefined'?storyStep:null,setSeed,actions,BASE,PED,team,STORY:CHAINS,setHook:f=>{hook=f;},setTask,TASKS,dreamNeed,scrapCap,newMeta,newState,calc,tick,checks,simulate,buy,bcost,canPay,stamp,pry,scrape,setJob,festival,festCost,observe,trade,pedlarBuy,nameSession,nameChoose,cycleShare,research,prjOpen,prjCost,endRun,craft,craftMax,upgrade,upgOpen,setKeep,setDuty,team,mindDraft,mindTake,rewire,canWire,nodeUp,nodeUpCost,service,valve,storyChoose,storyStep,BLD,PRJ,PRJ_BY,JOBS,DUTY,CRAFT,UPG,MT,PART,GUIDE,ENDS,QK,fmt,fmtLong,fmtTime,cal,thr,nb,lvl,setM:m=>{M=m;},getM:()=>M,log};

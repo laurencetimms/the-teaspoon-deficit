@@ -73,6 +73,7 @@ function score(S, c, a, P){
   let s = 0;
   if (a.kind == 'research') s = 4; else if (a.kind == 'project') s = a.id == 'p:engine' ? 9 : 3.6; else if (a.kind == 'upgrade') s = 3; else if (a.kind == 'build') s = buildWant(S, c, a.id.slice(2)); else if (a.kind == 'ending') s = P.wantEnding ? 5 : -1;
   if (P.mindFirst && (a.kind == 'project')) s += 2;
+  if (!P.fuzz && G.inCrisis(S) && a.kind == 'upgrade' && (a.cost.plate||0) > 0 && G.actions(S).some(x => /^p:(thruster|burn|charter|petition)$/.test(x.id) && !x.can)) s -= 2.5;   /* a diligent player keeps plate for the way out */
   if (!P.fuzz && G.inCrisis(S)) { const id = a.id.slice(2), A = G.arc(S);
     if (['drift','thruster','burn','unions','charter','petition'].includes(id)) s += 4;
     if (A.route == 'trust' && (id == 'boilers' || (id == 'boiler' && c.warm < c.warmNeed*1.2) || (id == 'bed' && S.r.lichen < 0.5*c.caps.lichen))) s += 3;
