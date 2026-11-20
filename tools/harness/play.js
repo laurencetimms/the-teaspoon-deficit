@@ -4,7 +4,7 @@
 const path = require('path');
 const G = require(path.join(__dirname, '..', '..', 'src', 'core.js'));
 
-const CRAFTED = ['plate','wire','spring','gear','lens','ledger','tea'];
+const CRAFTED = ['plate','wire','spring','gear','lens','ledger','tea','duct'];
 const TRADED = {grit:'choir', spores:'bloom', footnotes:'quorate'};
 const STORE = {scrap:['bunker','locker'], lichen:['locker','cellar'], ice:['cellar','locker'], notions:['shelf','obs','nook']};
 const HOUSING = ['hut','rack','warren'];
@@ -149,6 +149,7 @@ function playLife(name, seed, opt){
     for (const id of ids) if (!seen.has(id)) { seen.add(id); R.firsts.push([S.age, id, wall]); lastNew = S.age; lastNewWall = wall; sessionsQuiet = 0; }
   };
   const sample = () => {
+    if (opt.onSample) opt.onSample(S, G.calc(S));
     { const A = G.arc(S); if (A.ph >= 1 && R.mid == null) { R.mid = S.age; R.midWall = wall; } if (A.ph == 3 && R.resT == null) { R.resT = S.age; R.resWall = wall; }
       if (A.ph == 2 && A.ct > 4*3600) flag('crisis', A.route, 'The ' + (A.route == 'trust' ? 'Long Dark' : 'Quota') + ' has gone on for more than four hours of play without being resolved. ' + A.lost + ' crew lost so far, strain ' + Math.round(A.strain) + '%.');
       if (A.ph == 1 && S.age - (R.mid||S.age) > 1800) flag('crisis', 'undecided', 'The Bureau\'s directive has gone unanswered for half an hour.'); }

@@ -60,7 +60,7 @@ function newMeta(){ return {runs:0, endings:{}, ach:{}, guide:{}}; }
 function newState(quirk){
   const hz = {}; for (const k in M.endings) hz[k] = 1;
   const S = {v:2, t:Date.now(), age:0, pop:0, ship:shipName(), renames:0, paused:0,
-    r:{lichen:0, scrap:10, spoons:0, ice:0, notions:0, cycles:0, whimsy:0, plate:0, wire:0, spring:0, gear:0, lens:0, ledger:0, tea:0, grit:0, spores:0, footnotes:0},
+    r:{lichen:0, scrap:10, spoons:0, ice:0, notions:0, cycles:0, whimsy:0, plate:0, wire:0, spring:0, gear:0, lens:0, duct:0, ledger:0, tea:0, grit:0, spores:0, footnotes:0},
     made:0, hand:{stamp:0, pry:0, scrape:0, craft:0}, b:{}, up:{}, done:{}, seen:{}, crew:[], tun:0, tunT:0, arr:0, share:0.5,
     mand:0, mp:0, accord:60, accMod:0, fest:0, weather:0, hails:3, stand:{choir:0, bloom:0, quorate:0}, traded:{},
     pedlar:0, pedT:rnd(500,800), comet:0, cometT:rnd(120,200), comets:0,
@@ -92,6 +92,7 @@ const BLD = {
  obs:{n:'Observatory',d:'A hole with a lens in it. Catches some comets on its own.',c:{plate:30,lens:4},k:1.25,e:'+2.5K notion storage, +0.1 notions/s',req:S=>S.done.astronomy},
  band:{n:'Bandstand',d:'For the bards, who were going to perform anyway.',c:{plate:25,wire:5},k:1.3,e:'comfort +2',req:S=>S.done.music},
  shelf:{n:'Ledger shelves',d:'Floor-to-ceiling, then a bit more.',c:{plate:15,ledger:2},k:1.2,e:'+1.5K notion storage',req:S=>S.done.bookkeeping},
+ vent:{n:'Cold-air vent',d:'A duct through the hull that lets the outside in, a little. The Mind leans towards it.',c:{duct:6,plate:20},k:1.25,e:'cools the Mind by 1.5, twice at Aphelion; sealed if the ship leaves the rock',req:S=>S.done.vents},
  mill:{n:'Drawing mill',d:'Pulls plate into wire, slowly, with a noise like a cat.',c:{plate:40,gear:2},k:1.15,e:'turns plate into wire',req:S=>S.done.drawmill},
  bunker:{n:'Scrap bunker',d:'A sealed hold for scrap, lined with plate so it does not wander off.',c:{plate:40,spring:4},k:1.25,e:'+1.5K scrap storage',req:S=>S.done.springs},
  warren:{n:'Warren',d:'Dug by the crew themselves, into the old insulation. They will not let you see the plans.',c:{lichen:1500,plate:12},k:1.3,e:'+4 berths',req:S=>S.st.flags.homes},
@@ -116,6 +117,7 @@ const CRAFT = {
  wire:{n:'Wire',c:{plate:2},d:'Plate, persuaded to be long.',req:S=>S.done.wiredraw},
  tea:{n:'Tea',c:{lichen:60,ice:15},d:'Comfort in a cup. The crew drink it slowly and constantly.',req:S=>S.done.brewing},
  lens:{n:'Lens',c:{ice:40,grit:1},d:'Ice, ground with grit and held very still until it agrees to stay clear.',req:S=>S.done.lensgrind},
+ duct:{n:'Ducting',c:{plate:6,wire:4},d:'Lengths of pipe, crimped at the ends so the cold knows where to go.',req:S=>S.done.vents},
  spring:{n:'Spring',c:{wire:3},d:'Wire with a sense of humour.',req:S=>S.done.springs},
  ledger:{n:'Ledger',c:{plate:5,notions:150},d:'A notion, pressed into metal so it cannot wander off.',req:S=>S.done.bookkeeping},
  gear:{n:'Gear',c:{plate:2,spring:1},d:'A wheel with opinions about other wheels.',req:S=>S.done.gears}};
@@ -230,6 +232,12 @@ const MPOOL = S => { const p = ['rumin','attic','reflex','sock','grudge','pend']
   if (S.done.hydraulics) p.push('worry','sump','bilge','npress','metro');
   if (S.done.oneiro) p.push('daydream','echo','bureau','tickle'); return p; };
 const nbrs = (N,i) => { const o = []; if (N[i].p >= 0) o.push(N[i].p); N.forEach((n,j) => { if (n.p == i) o.push(j); }); return o; };
+/* The weather gets in. The Mind can take more heat in the cold and less in the warm. The Mind and water do not mix,
+   so ice is no use to it, but it gets on famously with a draught: cold-air vents cool it, twice as well at Aphelion,
+   until the ship leaves the rock and they have to be sealed against the void. */
+const WX = [0.8, 1, 1.3, 1];     /* Perihelion, Inswing, Aphelion, Outswing */
+function weatherH(S, c){ return WX[c.cal.i] * (1 + 0.4*arcDrift(S)) * (S.arc && S.arc.sum > S.age ? 0.85 : 1); }
+function ventCool(S, aph){ return S.sealed ? 0 : nb(S,'vent')*1.5*(aph ? 2 : 1); }
 function mindCalc(S, c){
   const N = S.mind.nodes, sulk = S.mind.sulk, out = [], base = new Array(N.length).fill(0), mult = new Array(N.length).fill(1);
   let heat = 0, cool = 0, cap = 0, gland = 0, npress = 0, bilge = 0;
@@ -262,12 +270,13 @@ function mindCalc(S, c){
     if (n.k == 'echo') { let best = 0; for (const j of ns) best = Math.max(best, base[j]); base[i] = best*0.5*Math.pow(n.lv,0.7)*e; }
   });
   heat += S.mind.heatBias||0;
-  const net = Math.max(0, heat - cool), hcap = (6 + 1.5*N.length)*S.m.hcap;
+  const vent = ventCool(S, aph); cool += vent;
+  const wx = weatherH(S, c), net = Math.max(0, heat - cool), hcap = (6 + 1.5*N.length)*S.m.hcap*wx;
   N.forEach((n,i) => { if (n.k == 'worry') base[i] = 0.5*n.lv*net*eff(n); });
   const pen = net > hcap ? Math.pow(hcap/net, 1.5) : 1;
   let cps = 0; N.forEach((n,i) => { out[i] = base[i]*mult[i]*pen*S.m.mind*(qk(S).cyc||1); cps += out[i]; });
   const div = npress ? Math.min(0.5, 0.12*Math.sqrt(npress)) : 0;
-  return {cps: cps*(1-div), out, heat: net, hcap, pen, cap: cap*(S.done.attic2 ? 1.5 : 1), notions: cps*div/6, gland, bilge, raw: cps};
+  return {cps: cps*(1-div), out, heat: net, hcap, pen, wx, vent, cap: cap*(S.done.attic2 ? 1.5 : 1), notions: cps*div/6, gland, bilge, raw: cps};
 }
 function mindScore(S){ const c = calc(S); return c.mind.cps + c.mind.notions*4 + c.mind.cap/500; }
 const storeRoom = S => { const N = S.mind.nodes, pr = N.filter(n => MT[n.k].g == 'prod').length, st = N.filter(n => MT[n.k].g == 'store').length; return pr > 2*st; };
@@ -786,6 +795,7 @@ const PRJ = [
  {id:'survey',tab:'sci',n:'Deep hull survey',d:'There are whole decks down there. Unlocks the Tun-rack.',c:{notions:2200},req:S=>S.done.metallurgy},
  {id:'smelting',tab:'sci',n:'Smelting',d:'Plate without the hammering. Unlocks the Smelter.',c:{notions:3200,plate:10},req:S=>S.done.metallurgy},
  {id:'brewing',tab:'sci',n:'Brewing',d:'Lichen and ice and patience. Unlocks tea and the Kettle-house, and the Brew-up.',c:{notions:3800,ice:50},req:S=>S.done.condense&&S.done.philosophy},
+ {id:'vents',tab:'sci',n:'Ventilation',d:'The Mind and water do not mix, but the Mind and a draught get on famously. The Workshop can make ducting, and the hull can take cold-air vents.',c:{notions:9000,plate:40},req:S=>S.seen.glitch>=1&&S.done.wiredraw},
  {id:'wiredraw',tab:'sci',n:'Wiredrawing',d:'Plate, pulled. Unlocks wire.',c:{notions:4500,plate:15},req:S=>S.done.smelting||S.done.signal},
  {id:'pedagogy',tab:'sci',n:'Pedagogy',d:'Teaching, as a subject. Unlocks the Schoolroom.',c:{notions:5000},req:S=>S.done.delegation},
  {id:'lensgrind',tab:'sci',n:'Lens grinding',d:'Ice, ground with grit. Grit comes from the Gravel Choir. Unlocks lenses.',c:{notions:6000,ice:100},req:S=>S.done.signal&&S.done.condense},
@@ -833,7 +843,7 @@ const PRJ = [
  {id:'burn',tab:'mind',n:'Correction burn',d:'Push the rock back towards the sun. This ends the Long Dark.',c:{cycles:6000,plate:50},req:S=>S.done.thruster&&(inCrisis(S,'trust')||S.done.burn),fx:S=>arcResolve(S)},
  {id:'charter',tab:'mind',n:'Draft the Charter of the Commons',d:'What the crew will do, and what they will not, written large enough for everyone to lick.',c:{whimsy:80,plate:25},req:S=>S.done.unions&&(inCrisis(S,'obey')||S.done.charter)},
  {id:'petition',tab:'mind',n:'Send the Charter to the Bureau',d:'Through proper channels, with footnotes. This ends the quota.',c:{cycles:6000,plate:50},req:S=>S.done.charter&&(inCrisis(S,'obey')||S.done.petition),fx:S=>arcResolve(S)},
- {id:'engine',tab:'mind',n:'Reignite the engine',d:'Leave the rock. The end of stage one.',c:{cycles:25000,gear:40,plate:600},req:S=>S.done.ignition,fx:S=>{S.seen.stage2=1;log(S,'The engine coughs, and catches, and then you remember you have not built the next part yet. (End of stage one.)','big');ach('stage1');}}];
+ {id:'engine',tab:'mind',n:'Reignite the engine',d:'Leave the rock. The end of stage one.',c:{cycles:25000,gear:40,plate:600},req:S=>S.done.ignition,fx:S=>{S.seen.stage2=1;if(nb(S,'vent')){S.sealed=1;log(S,'The vents are sealed. Out here there is no outside air to bring in, only the void, which is not cold so much as absent. The Mind sulks about the draught.','bad');}log(S,'The engine coughs, and catches, and then you remember you have not built the next part yet. (End of stage one.)','big');ach('stage1');}}];
 const PRJ_BY = {}; PRJ.forEach(p => PRJ_BY[p.id] = p);
 const prjCost = (S,p) => { const f = p.cf ? p.cf(S) : 1; if (f == 1) return p.c; const o = {}; for (const r in p.c) o[r] = p.c[r]*f; return o; };
 const prjOpen = (S,tab) => PRJ.filter(p => p.tab == tab && !S.done[p.id] && p.req(S));
@@ -859,7 +869,7 @@ const GUIDE = [
  {id:'mandate',t:'Mandate',x:'The Bureau’s standing instruction to you. It grows with every spoon. Nobody has checked on it in nine thousand years, including the Bureau.',c:S=>S.mand>=1},
  {id:'bureau',t:'The Bureau',x:'The Bureau of Cutlery Equilibrium. Motto: Somebody Has To. Current staffing: you.',c:S=>S.seen.mind},
  {id:'mind',t:'The Mind',x:'Yours. Nobody designed it; things were added. Every subsystem was somebody’s good idea at the time.',c:S=>S.mind.nodes.length>=2},
- {id:'heat',t:'Heat',x:'Thinking is warm work. Think too hard and things start happening that nobody asked for.',c:S=>S.seen.glitch},
+ {id:'heat',t:'Heat',x:'Thinking is warm work. Think too hard and things start happening that nobody asked for. The weather gets in: the Mind takes more heat in the cold seasons and less in the warm. It will not touch ice. Water and the Mind do not mix.',c:S=>S.seen.glitch},
  {id:'whimsy',t:'Whimsy',x:'What a full mind leaks. Useless, and therefore the only thing some doors will open for.',c:S=>S.r.whimsy>=1},
  {id:'duty',t:'Duties',x:'The crew can learn anything you can do, given time and a great many ruined spoons. They learn more from the ruined ones.',c:S=>Object.keys(S.duty).length>=1},
  {id:'accord',t:'Accord',x:'How the crew feel about you. They work harder when it is high. They have noticed you counting them.',c:S=>S.done.philosophy},

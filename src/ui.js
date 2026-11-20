@@ -4,14 +4,14 @@ const h = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e
 const btn = (cls, txt, fn) => { const b = h('button', cls, txt); b.type = 'button'; if (fn) b.onclick = fn; return b; };
 let S, C, cur = 'hull', ups = [], fixed = [], sig = '', tabSig = '', buyQ = 1, jobQ = 1, openK = {}, showDone = false, pulseV = 0, needEnd = false, logSeen = null;
 let opt = {sound:0, calm:0}, main, loadedT = 0, mindCv = null;
-const SAVE_KEY = 'tsd2.save', VERSION = '1.5', BUILD = 'Stage one \u00b7 version ' + VERSION + ' \u00b7 19 Nov 2026';
+const SAVE_KEY = 'tsd2.save', VERSION = '1.6', BUILD = 'Stage one \u00b7 version ' + VERSION + ' \u00b7 19 Nov 2026';
 const U = fn => { ups.push(fn); fn(); };
 const setT = (el, t) => { if (el._t !== t) { el._t = t; el.textContent = t; } };
 const setD = (el, k, v) => { if (el.dataset[k] !== v) el.dataset[k] = v; };
 const fmt3 = x => { if (!isFinite(x)) return '∞'; if (x < 0) return '−' + fmt3(-x); if (x < 1000) return x >= 100 || x % 1 === 0 ? String(Math.floor(x)) : x >= 10 ? x.toFixed(1) : x.toFixed(2); const e = Math.min(8, Math.floor(Math.log10(x)/3)), v = x/Math.pow(1000,e); return (v >= 1000 ? v.toExponential(1) : v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)) + UNITS[e]; };
 const qn = () => buyQ == 'max' ? 500 : buyQ;
 const act = fn => () => { if (S.paused) { toast('Paused. Tap Resume to carry on.'); return; } S.here = S.age; fn(); S.acts = (S.acts||0) + 1; checks(S); frameUI(); };
-const RNAME = {lichen:'lichen', scrap:'scrap', spoons:'spoons', ice:'ice', notions:'notions', cycles:'thought', whimsy:'whimsy', plate:'plate', wire:'wire', spring:'springs', gear:'gears', lens:'lenses', ledger:'ledgers', tea:'tea', grit:'grit', spores:'spores', footnotes:'footnotes'};
+const RNAME = {lichen:'lichen', scrap:'scrap', spoons:'spoons', ice:'ice', notions:'notions', cycles:'thought', whimsy:'whimsy', plate:'plate', wire:'wire', spring:'springs', duct:'ducting', gear:'gears', lens:'lenses', ledger:'ledgers', tea:'tea', grit:'grit', spores:'spores', footnotes:'footnotes'};
 
 function costState(c){ let st = ''; for (const r in c) if ((S.r[r]||0) < c[r] - 1e-9) { if (c[r] > capOf(S,C,r)) return 'cap'; st = 'no'; } return st; }
 function costEl(fn){
@@ -231,7 +231,7 @@ R.mind = el => {
   else el.append(item('draft', {title:() => 'Requisition a subsystem', act:() => mindDraft(S), state:() => S.mp >= 1 ? '' : 'no', desc:'Spend 1 Mandate. The Bureau sends three candidates, all second-hand. Pick one to fit. The Bureau only sends storage when the Mind has more than twice as many thinking parts as storage parts, and then it always sends one.', more:d => note(d, () => S.mp >= 1 ? S.mp + ' Mandate to spend.' : 'You need Mandate, which comes from making spoons.')}));
   /* the diagram */
   const wrap = h('div','mindwrap'), leg = h('div','legend'); for (const g in MG) { const c = h('span','lg'); c.style.setProperty('--c', 'var(' + GCOL[g] + ')'); c.textContent = MG[g]; leg.append(c); } mindCv = h('canvas','mindcv'); mindCv.setAttribute('role','img'); mindCv.setAttribute('aria-label','Diagram of the Mind’s subsystems and how they are wired'); mindCv.onclick = mindTap; wrap.append(mindCv); el.append(wrap, leg);
-  const stats = h('div','mstats'); U(() => { const mc = C.mind; setT(stats, 'Thinking ' + fmt(mc.cps) + '/s · holds ' + fmt(mc.cap) + ' · heat ' + mc.heat.toFixed(1) + ' of ' + mc.hcap.toFixed(0) + (mc.pen < 1 ? ' · overheating: thought −' + Math.round(100*(1-mc.pen)) + '%' : '') + (mc.notions > 0 ? ' · +' + fmt(mc.notions) + ' notions/s' : '')); }); el.append(stats);
+  const stats = h('div','mstats'); U(() => { const mc = C.mind; setT(stats, 'Thinking ' + fmt(mc.cps) + '/s · holds ' + fmt(mc.cap) + ' · heat ' + mc.heat.toFixed(1) + ' of ' + mc.hcap.toFixed(0) + (mc.wx > 1.05 ? ' (the cold is getting in)' : mc.wx < 0.95 ? ' (the warm is getting in)' : '') + (mc.vent ? ' · vents cooling ' + mc.vent.toFixed(1) : S.sealed && nb(S,'vent') ? ' · vents sealed' : '') + (mc.pen < 1 ? ' · overheating: thought −' + Math.round(100*(1-mc.pen)) + '%' : '') + (mc.notions > 0 ? ' · +' + fmt(mc.notions) + ' notions/s' : '')); }); el.append(stats);
   meter(el, () => C.mind.heat/(C.mind.hcap*1.5), 'heat');
   const N = S.mind.nodes, i = Math.min(S.mind.sel||0, N.length-1), n = N[i], T = MT[n.k], pn = h('div','node');
   pn.append(h('p','pt', MG[T.g] + (i == 0 ? '' : ' · wired to the ' + MT[N[n.p].k].n)), h('h3','', T.n), h('p','note', T.d));
@@ -373,8 +373,8 @@ function drawShip(){
   b.classList.toggle('pan', on); if (on) { b.style.setProperty('--pan', -(over + 8) + 'px'); b.style.setProperty('--dur', (5 + (over + 8)/14).toFixed(1) + 's'); }
 }
 /* ---------- fixed chrome ---------- */
-const ALLRES = ['lichen','scrap','spoons','ice','notions','cycles','whimsy','plate','wire','spring','gear','lens','ledger','tea','grit','spores','footnotes'];
-const TABRES = {hull:['lichen','scrap','spoons','ice','plate'], shop:['scrap','plate','wire','spring','gear','lens','ledger','tea'], crew:['lichen','tea','spoons','whimsy'],
+const ALLRES = ['lichen','scrap','spoons','ice','notions','cycles','whimsy','plate','wire','spring','duct','gear','lens','ledger','tea','grit','spores','footnotes'];
+const TABRES = {hull:['lichen','scrap','spoons','ice','plate'], shop:['scrap','plate','wire','spring','duct','gear','lens','ledger','tea'], crew:['lichen','tea','spoons','whimsy'],
   sci:['notions','plate','lens','ledger','spores','footnotes'], mind:['cycles','whimsy','notions','plate','gear'], trade:['spoons','tea','ledger','grit','spores','footnotes'],
   time:['lichen','scrap','spoons','notions','cycles'], margin:['lichen','scrap','spoons','notions','cycles'], rec:['lichen','scrap','spoons','notions','cycles']};
 const resUnlocked = r => r == 'lichen' || r == 'scrap' || (r == 'spoons' && S.made >= 1) || (r == 'ice' && (S.r.ice > 0 || S.done.condense)) || (r == 'notions' && nb(S,'nook') >= 1) || (r == 'cycles' && S.seen.mind) || (r == 'whimsy' && (S.r.whimsy >= 0.5 || S.done.apology)) || (CRAFT[r] && (CRAFT[r].req(S) || S.r[r] > 0)) || ((r == 'grit' || r == 'spores' || r == 'footnotes') && (S.r[r] > 0 || nb(S,'antenna') >= 1));
@@ -393,7 +393,7 @@ function flows(r){ const c = C, m = S.m, f = [], aph = c.cal.i == 2;
   if (r == 'plate') { if (c.smelt && S.r.scrap > c.caps.scrap*0.5) add('Smelters', c.smelt/50); if (c.mill) add('Drawing mills', -c.mill*0.03); }
   if (r == 'wire' && c.mill) add('Drawing mills', c.mill*0.015);
   return f; }
-const ORIGIN = {whimsy:'Leaks from a full Mind and from bards (three times as much once they know Work songs). Spent on odd projects, latitude and the pedlar.', plate:'Hammered from scrap in the Workshop, or sweated out by smelters.', wire:'Drawn from plate in the Workshop or by drawing mills.', spring:'Coiled from wire in the Workshop.', gear:'Cut in the Workshop from plate and springs.', lens:'Ground from ice and grit in the Workshop.', ledger:'Pressed from plate and notions in the Workshop. The Quorate want them.', tea:'Brewed by kettle-houses or by hand in the Workshop. The crew drink it constantly.', grit:'Only the Gravel Choir have it. Hail them from the Trade tab.', spores:'Only the Slow Bloom have them.', footnotes:'Only the Quorate sell them, for ledgers.', spoons:'Stamped from scrap by hand, by presses and by the rota.', cycles:'Thought. The Mind makes it; projects and the naming committee spend it.'};
+const ORIGIN = {duct:'Crimped from plate and wire in the Workshop. Built into cold-air vents, which cool the Mind.', whimsy:'Leaks from a full Mind and from bards (three times as much once they know Work songs). Spent on odd projects, latitude and the pedlar.', plate:'Hammered from scrap in the Workshop, or sweated out by smelters.', wire:'Drawn from plate in the Workshop or by drawing mills.', spring:'Coiled from wire in the Workshop.', gear:'Cut in the Workshop from plate and springs.', lens:'Ground from ice and grit in the Workshop.', ledger:'Pressed from plate and notions in the Workshop. The Quorate want them.', tea:'Brewed by kettle-houses or by hand in the Workshop. The crew drink it constantly.', grit:'Only the Gravel Choir have it. Hail them from the Trade tab.', spores:'Only the Slow Bloom have them.', footnotes:'Only the Quorate sell them, for ledgers.', spoons:'Stamped from scrap by hand, by presses and by the rota.', cycles:'Thought. The Mind makes it; projects and the naming committee spend it.'};
 function showStore(r){
   sheet((el, close) => {
     const cap = capOf(S,C,r), f = flows(r), net = f.reduce((a,x) => a + x[1], 0);
