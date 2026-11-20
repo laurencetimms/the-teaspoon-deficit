@@ -53,6 +53,7 @@ node tools/play.js               # scripted opening, Mind, a story, a duty, craf
 
 The version shows in the game's menu. Stage one is 1.x: the middle number goes up for new features, the last for fixes. Set it in `VERSION` at the top of `src/ui.js`.
 
+- 1.6.1: play journal (Menu, Play journal) for analysing real play
 - 1.6: the weather gets into the Mind (more heat headroom in the cold, less in the warm); Ventilation, ducting and cold-air vents, sealed if the ship leaves the rock
 - 1.5: upgrades are trialled by the crew, can fail, and cost what their era can afford; Boiler jackets need four boilers and Wire drawing
 - 1.4.2: the committee's chosen name goes on the hull, tapping the name cycles the register; long names pan
